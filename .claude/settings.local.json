@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx --yes create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\")",
+      "Bash(npx --yes create-next-app@latest /c/Users/glewi/lot-scaffold --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\")",
+      "Read(//c/Users/glewi/lot-scaffold/**)",
+      "Bash(cp /c/Users/glewi/lot-scaffold/next.config.ts /c/Users/glewi/lot-scaffold/tsconfig.json /c/Users/glewi/lot-scaffold/postcss.config.mjs /c/Users/glewi/lot-scaffold/eslint.config.mjs /c/Users/glewi/lot-scaffold/next-env.d.ts /c/Users/glewi/League-of-Thrones-App/)",
+      "Bash(mkdir -p /c/Users/glewi/League-of-Thrones-App/public)",
+      "Bash(cp /c/Users/glewi/lot-scaffold/public/*.svg /c/Users/glewi/League-of-Thrones-App/public/)",
+      "Bash(mkdir -p /c/Users/glewi/League-of-Thrones-App/src/app)",
+      "Bash(cp /c/Users/glewi/lot-scaffold/src/app/layout.tsx /c/Users/glewi/lot-scaffold/src/app/page.tsx /c/Users/glewi/lot-scaffold/src/app/globals.css /c/Users/glewi/lot-scaffold/src/app/favicon.ico /c/Users/glewi/League-of-Thrones-App/src/app/)",
+      "Bash(npm install *)",
+      "Bash(npx vitest *)",
+      "Bash(npx tsc *)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\glewi\\lot-scaffold",
+      "C:\\Users\\glewi\\League-of-Thrones-App\\src\\app\\teams"
+    ]
+  }
+}

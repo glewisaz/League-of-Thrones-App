@@ -1,27 +1,39 @@
-# Env
+# Env (keep .env.example committed)
 .env
 .env.local
 .env*.local
 
 # Dependencies
 node_modules/
+/.pnp
+.pnp.*
 __pycache__/
 *.pyc
 .venv/
 venv/
 
 # Next.js
-.next/
-out/
-build/
+/.next/
+/out/
+/build
+next-env.d.ts
 
 # Importer output
 scripts/out/
+
+# TypeScript
+*.tsbuildinfo
 
 # IDE
 .vscode/
 .idea/
 .DS_Store
+*.pem
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Vercel
 .vercel
