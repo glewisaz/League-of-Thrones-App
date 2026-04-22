@@ -1,18 +1,29 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0a0a0a;
-  --foreground: #e5e5e5;
+  --background: #0a0c10;
+  --foreground: #e8eaf0;
+  --accent: #00E5FF;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-accent: var(--accent);
+  --font-sans: var(--font-figtree);
+  --font-mono: var(--font-dm-mono);
 }
 
 body {
-  background: var(--background);
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(0, 229, 255, 0.06) 0%, transparent 70%),
+    var(--background);
   color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }

@@ -40,14 +40,14 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
       </nav>
 
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-amber-400">{team.owner_name}</h1>
+        <h1 className="text-2xl font-bold text-accent">{team.owner_name}</h1>
         {team.name && <p className="text-neutral-400 mt-1">{team.name}</p>}
       </div>
 
       <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-5 mb-8">
         <div className="flex justify-between items-baseline mb-2">
           <span className="text-sm font-medium text-neutral-300">2025 Cap Commitment</span>
-          <span className="text-sm font-mono text-neutral-300">
+          <span className="num text-sm text-neutral-300">
             ${totalCommitted}{' '}
             <span className="text-neutral-600">/ ${auctionCap}</span>
           </span>
@@ -55,12 +55,12 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
         <div className="h-2 bg-neutral-800 rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all ${
-              capPct > 90 ? 'bg-red-500' : capPct > 70 ? 'bg-amber-500' : 'bg-amber-400'
+              capPct > 90 ? 'bg-red-500' : capPct > 70 ? 'bg-yellow-400' : 'bg-accent'
             }`}
             style={{ width: `${capPct}%` }}
           />
         </div>
-        <p className="text-xs text-neutral-600 mt-1.5">
+        <p className="num text-xs text-neutral-600 mt-1.5">
           {roster.length} players · {capPct}% of cap
         </p>
       </div>
@@ -90,11 +90,11 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
                   )}
                 </td>
                 <td className="px-4 py-3 text-neutral-400">{entry.position ?? '—'}</td>
-                <td className="px-4 py-3 text-center text-neutral-500">Y{entry.contract_year}</td>
-                <td className="px-4 py-3 text-right font-mono text-neutral-200">
+                <td className="num px-4 py-3 text-center text-neutral-500">Y{entry.contract_year}</td>
+                <td className="num px-4 py-3 text-right text-neutral-200">
                   ${entry.current_year_cost}
                 </td>
-                <td className="px-4 py-3 text-right font-mono text-neutral-500">
+                <td className="num px-4 py-3 text-right text-neutral-500">
                   {entry.next_year_cost != null ? `$${entry.next_year_cost}` : '—'}
                 </td>
               </tr>
@@ -121,7 +121,7 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
                     key={pick.id}
                     className="border-b border-neutral-800/50 last:border-0"
                   >
-                    <td className="px-4 py-3 text-neutral-300">{pick.season}</td>
+                    <td className="num px-4 py-3 text-neutral-300">{pick.season}</td>
                     <td className="px-4 py-3 text-neutral-400 capitalize">{pick.pick_type}</td>
                     <td className="px-4 py-3 text-neutral-500">{pick.notes ?? '—'}</td>
                   </tr>
