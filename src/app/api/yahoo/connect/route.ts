@@ -5,7 +5,7 @@ export async function GET() {
     client_id: process.env.YAHOO_CLIENT_ID!,
     redirect_uri: process.env.YAHOO_REDIRECT_URI!,
     response_type: 'code',
-    scope: 'openid',
+    scope: 'fspt-r',
   });
 
   return NextResponse.redirect(
