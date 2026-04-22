@@ -1,0 +1,27 @@
+# Env
+.env
+.env.local
+.env*.local
+
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Next.js
+.next/
+out/
+build/
+
+# Importer output
+scripts/out/
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Vercel
+.vercel
