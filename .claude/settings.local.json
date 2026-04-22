@@ -11,7 +11,10 @@
       "Bash(cp /c/Users/glewi/lot-scaffold/src/app/layout.tsx /c/Users/glewi/lot-scaffold/src/app/page.tsx /c/Users/glewi/lot-scaffold/src/app/globals.css /c/Users/glewi/lot-scaffold/src/app/favicon.ico /c/Users/glewi/League-of-Thrones-App/src/app/)",
       "Bash(npm install *)",
       "Bash(npx vitest *)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\glewi\\lot-scaffold",
