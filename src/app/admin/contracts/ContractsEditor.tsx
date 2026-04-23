@@ -30,9 +30,11 @@ function teamLabel(t: TeamOption) {
 export default function ContractsEditor({
   initialContracts,
   teams,
+  seasonYear,
 }: {
   initialContracts: ContractRow[];
   teams: TeamOption[];
+  seasonYear: number;
 }) {
   const [selectedTeamId, setSelectedTeamId] = useState(teams[0]?.id ?? '');
   const [contracts, setContracts] = useState<ContractRow[]>(initialContracts);
@@ -141,7 +143,7 @@ export default function ContractsEditor({
                 <th className="hidden md:table-cell text-left px-3 py-2 font-medium">Acquisition</th>
                 <th className="hidden md:table-cell text-right px-3 py-2 font-medium">Y1 $</th>
                 <th className="text-center px-3 py-2 font-medium">Yr</th>
-                <th className="text-right px-3 py-2 font-medium">2025 Cost</th>
+                <th className="text-right px-3 py-2 font-medium">{seasonYear} Cost</th>
                 <th className="hidden md:table-cell text-right px-3 py-2 font-medium">Next</th>
                 <th className="text-left px-3 py-2 font-medium">Status</th>
               </tr>

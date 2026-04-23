@@ -33,8 +33,10 @@ const BADGE_CLASS: Record<TransactionRow['transaction_type'], string> = {
 
 export default function TransactionsFeed({
   transactions,
+  seasonYear,
 }: {
   transactions: TransactionRow[];
+  seasonYear: number;
 }) {
   const [query, setQuery] = useState('');
 
@@ -62,7 +64,7 @@ export default function TransactionsFeed({
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-accent">The Raven</h1>
         <p className="text-neutral-500 mt-1 text-sm">
-          2025 Season · waiver wire &amp; trade activity
+          {seasonYear} Season · waiver wire &amp; trade activity
         </p>
       </div>
 

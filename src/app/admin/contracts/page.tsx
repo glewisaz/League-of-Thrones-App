@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createSessionClient } from '@/lib/supabase/ssr-server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getActiveSeason } from '@/lib/queries/seasons';
 import ContractsEditor, { type ContractRow, type TeamOption } from './ContractsEditor';
 
 export default async function AdminContractsPage() {
@@ -12,7 +13,7 @@ export default async function AdminContractsPage() {
 
   const admin = createAdminClient();
 
-  const [{ data: contracts, error: contractsError }, { data: teams, error: teamsError }] =
+  const [{ data: contracts, error: contractsError }, { data: teams, error: teamsError }, season] =
     await Promise.all([
       admin
         .from('contracts')
@@ -21,6 +22,7 @@ export default async function AdminContractsPage() {
         )
         .order('current_team_id'),
       admin.from('teams').select('id, name, owner_name').order('owner_name'),
+      getActiveSeason(),
     ]);
 
   if (contractsError) throw contractsError;
@@ -40,6 +42,7 @@ export default async function AdminContractsPage() {
         <ContractsEditor
           initialContracts={(contracts ?? []) as unknown as ContractRow[]}
           teams={(teams ?? []) as TeamOption[]}
+          seasonYear={season?.year ?? new Date().getFullYear()}
         />
       </div>
     </div>

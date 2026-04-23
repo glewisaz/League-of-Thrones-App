@@ -4,22 +4,43 @@ import {
   getTeamBySlug,
   getTeamRoster,
   getDraftPicksForTeam,
-  getActiveAuctionCap,
   type DraftPickWithTeams,
 } from '@/lib/queries/teams';
+import { getActiveSeason } from '@/lib/queries/seasons';
 
 const POSITION_ORDER: Record<string, number> = { QB: 1, RB: 2, WR: 3, TE: 4, K: 5, DST: 6 };
+
+function ContractPips({ year }: { year: number }) {
+  const color = year <= 2 ? '#00E5FF' : year === 3 ? '#ffb800' : '#ff4d4d';
+  return (
+    <span className="inline-flex items-center gap-[3px]" title={`Y${year}`}>
+      {[1, 2, 3, 4].map((i) => (
+        <span
+          key={i}
+          className="inline-block rounded-sm"
+          style={{
+            width: 6,
+            height: 6,
+            backgroundColor: i <= year ? color : 'rgba(255,255,255,0.15)',
+          }}
+        />
+      ))}
+    </span>
+  );
+}
 
 export default async function TeamPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const team = await getTeamBySlug(slug);
   if (!team) notFound();
 
-  const [roster, picks, auctionCap] = await Promise.all([
+  const [roster, picks, season] = await Promise.all([
     getTeamRoster(team.id),
     getDraftPicksForTeam(team.id),
-    getActiveAuctionCap(),
+    getActiveSeason(),
   ]);
+  const auctionCap = season?.auction_cap ?? 200;
+  const seasonYear = season?.year ?? new Date().getFullYear();
 
   const sorted = [...roster].sort(
     (a, b) =>
@@ -48,7 +69,7 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
       {/* Cap commitment card */}
       <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4 md:p-5 mb-8">
         <div className="flex justify-between items-baseline mb-2">
-          <span className="text-sm font-medium text-neutral-300">2025 Cap Commitment</span>
+          <span className="text-sm font-medium text-neutral-300">{seasonYear} Cap Commitment</span>
           <span className="num text-sm text-neutral-300">
             ${totalCommitted}{' '}
             <span className="text-neutral-600">/ ${auctionCap}</span>
@@ -94,7 +115,9 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
                     )}
                   </td>
                   <td className="px-4 py-3 text-neutral-400">{entry.position ?? '—'}</td>
-                  <td className="num px-4 py-3 text-center text-neutral-500">Y{entry.contract_year}</td>
+                  <td className="px-4 py-3 text-center">
+                    <ContractPips year={entry.contract_year} />
+                  </td>
                   <td className="num px-4 py-3 text-right text-neutral-200">
                     ${entry.current_year_cost}
                   </td>
