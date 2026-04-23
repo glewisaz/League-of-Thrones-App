@@ -104,10 +104,10 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
         </table>
       </div>
 
-      {picks.length > 0 && (
-        <>
-          <h2 className="text-lg font-semibold text-neutral-200 mb-4">Draft Picks</h2>
-          <div className="bg-neutral-900 border border-neutral-800 rounded-lg overflow-hidden">
+      <div>
+        <h2 className="text-lg font-semibold text-neutral-200 mb-4">Draft Picks</h2>
+        <div className="bg-neutral-900 border border-neutral-800 rounded-lg overflow-hidden">
+          {picks.length > 0 ? (
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-neutral-800 text-neutral-500 text-xs uppercase tracking-wide">
@@ -120,9 +120,10 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
                 {picks.map((pick: DraftPickWithTeams) => {
                   const traded = pick.original_team_id !== pick.current_team_id;
                   const origName = pick.original_team?.name;
-                  const label = traded && origName
-                    ? `${pick.season} Round ${pick.round} (via ${origName})`
-                    : `${pick.season} Round ${pick.round}`;
+                  const label =
+                    traded && origName
+                      ? `${pick.season} Round ${pick.round} (via ${origName})`
+                      : `${pick.season} Round ${pick.round}`;
                   return (
                     <tr
                       key={pick.id}
@@ -136,9 +137,13 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
                 })}
               </tbody>
             </table>
-          </div>
-        </>
-      )}
+          ) : (
+            <p className="px-4 py-8 text-center text-sm text-neutral-500 italic">
+              The ravens bring no tidings of picks. You have traded them all away, you fool.
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
