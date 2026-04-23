@@ -82,6 +82,7 @@ export default async function RecordBookPage() {
         {champions.length === 0 ? (
           <p className="text-neutral-600 italic text-sm">No champions recorded yet.</p>
         ) : (
+          <>
           <div className="bg-neutral-900 border border-neutral-800 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -90,7 +91,7 @@ export default async function RecordBookPage() {
                     <th className="text-left px-4 py-3 font-medium">Season</th>
                     <th className="text-left px-4 py-3 font-medium">Champion</th>
                     <th className="hidden sm:table-cell text-left px-4 py-3 font-medium">Runner-Up</th>
-                    <th className="hidden md:table-cell text-left px-4 py-3 font-medium">Notes</th>
+                    <th className="hidden sm:table-cell text-left px-4 py-3 font-medium">Notes</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -101,6 +102,7 @@ export default async function RecordBookPage() {
                     >
                       <td className="num px-4 py-3 text-neutral-400 font-medium whitespace-nowrap">
                         {row.season}
+                        {row.notes && <sup className="ml-0.5 text-yellow-400/70">*</sup>}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className="font-semibold text-yellow-400">
@@ -115,7 +117,7 @@ export default async function RecordBookPage() {
                       <td className="hidden sm:table-cell px-4 py-3 text-neutral-400 whitespace-nowrap">
                         {ownerOnly(row.runner_up)}
                       </td>
-                      <td className="hidden md:table-cell px-4 py-3 text-neutral-500 text-xs">
+                      <td className="hidden sm:table-cell px-4 py-3 text-neutral-500 text-xs">
                         {row.notes ?? ''}
                       </td>
                     </tr>
@@ -124,6 +126,20 @@ export default async function RecordBookPage() {
               </table>
             </div>
           </div>
+
+          {/* Footnotes — one line per unique non-null note */}
+          {champions.some((r) => r.notes) && (
+            <ul className="mt-3 space-y-0.5">
+              {[...new Set(champions.filter((r) => r.notes).map((r) => r.notes as string))].map(
+                (note) => (
+                  <li key={note} className="text-xs italic text-neutral-600">
+                    * {note}
+                  </li>
+                ),
+              )}
+            </ul>
+          )}
+          </>
         )}
       </section>
 
