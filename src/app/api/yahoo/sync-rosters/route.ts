@@ -27,6 +27,10 @@ export async function GET() {
       .maybeSingle();
     const seasonYear = (seasonData as { year: number } | null)?.year ?? 2025;
 
+    // DEBUG — remove once response structure is confirmed
+    const rosterData = await yahooFetch(`/league/${auth.league_key}/teams;out=roster`)
+    return NextResponse.json({ debug: rosterData })
+
     const response = (await yahooFetch(
       `/league/${auth.league_key}/teams;out=roster`,
     )) as Record<string, unknown>;
