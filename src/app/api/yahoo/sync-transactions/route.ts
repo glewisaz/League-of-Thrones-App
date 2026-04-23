@@ -32,6 +32,8 @@ export async function GET() {
     }
 
     const transactions = await fetchAllTransactions(auth.league_key);
+    console.log('Raw transactions fetched:', transactions.length);
+    console.log('First transaction sample:', JSON.stringify(transactions[0], null, 2));
     if (transactions.length === 0) {
       return NextResponse.json({ ok: true, transactions_synced: 0 });
     }
