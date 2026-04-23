@@ -50,9 +50,9 @@ export async function GET() {
       if (!name) continue;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const logosObj = findInArray(info, 'team_logos') as any;
-      const logoUrl: string | null =
-        logosObj?.team_logo?.url ?? logosObj?.team_logo?.[0]?.url ?? null;
+      const logosArr = findInArray(info, 'team_logos') as any;
+      // Yahoo returns team_logos as [{team_logo:{url:...}}]
+      const logoUrl: string | null = logosArr?.[0]?.team_logo?.url ?? null;
 
       const slug = slugify(name);
 
