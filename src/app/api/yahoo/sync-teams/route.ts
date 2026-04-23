@@ -59,8 +59,8 @@ export async function GET() {
       const slug = slugify(name);
 
       const { error } = await supabase.from('teams').upsert(
-        { name, owner_name: '', conference: 'north', slug, logo_url: logoUrl, yahoo_team_key: teamKey ?? null },
-        { onConflict: 'slug' },
+        { name, slug, logo_url: logoUrl, yahoo_team_key: teamKey ?? null },
+        { onConflict: 'slug', ignoreDuplicates: false },
       );
 
       if (error) {
