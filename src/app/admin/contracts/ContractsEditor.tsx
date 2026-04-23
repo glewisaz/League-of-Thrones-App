@@ -97,11 +97,11 @@ export default function ContractsEditor({
   return (
     <div>
       {/* Team selector */}
-      <div className="flex items-center gap-3 mb-5">
+      <div className="flex flex-wrap items-center gap-3 mb-5">
         <select
           value={selectedTeamId}
           onChange={(e) => setSelectedTeamId(e.target.value)}
-          className="bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-[#e8eaf0] text-sm focus:outline-none focus:border-[#00E5FF]"
+          className="w-full md:w-auto bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-[#e8eaf0] text-sm focus:outline-none focus:border-[#00E5FF]"
         >
           {teams.map((t) => (
             <option key={t.id} value={t.id}>
@@ -137,11 +137,11 @@ export default function ContractsEditor({
               <tr className="border-b border-neutral-800 text-neutral-500 text-xs uppercase tracking-wide whitespace-nowrap">
                 <th className="text-left px-3 py-2 font-medium">Player</th>
                 <th className="text-left px-3 py-2 font-medium">Pos</th>
-                <th className="text-left px-3 py-2 font-medium">Acquisition</th>
-                <th className="text-right px-3 py-2 font-medium">Y1 $</th>
+                <th className="hidden md:table-cell text-left px-3 py-2 font-medium">Acquisition</th>
+                <th className="hidden md:table-cell text-right px-3 py-2 font-medium">Y1 $</th>
                 <th className="text-center px-3 py-2 font-medium">Yr</th>
                 <th className="text-right px-3 py-2 font-medium">Now</th>
-                <th className="text-right px-3 py-2 font-medium">Next</th>
+                <th className="hidden md:table-cell text-right px-3 py-2 font-medium">Next</th>
                 <th className="text-left px-3 py-2 font-medium">Status</th>
               </tr>
             </thead>
@@ -168,7 +168,7 @@ export default function ContractsEditor({
                     <td className="px-3 py-1.5 text-neutral-500 text-xs whitespace-nowrap">
                       {position}
                     </td>
-                    <td className="px-3 py-1.5">
+                    <td className="hidden md:table-cell px-3 py-1.5">
                       <select
                         value={c.acquisition_type}
                         onChange={(e) =>
@@ -183,7 +183,7 @@ export default function ContractsEditor({
                         ))}
                       </select>
                     </td>
-                    <td className="px-3 py-1.5 text-right">
+                    <td className="hidden md:table-cell px-3 py-1.5 text-right">
                       <input
                         type="number"
                         min={0}
@@ -213,7 +213,7 @@ export default function ContractsEditor({
                     <td className="num px-3 py-1.5 text-right text-neutral-200 whitespace-nowrap">
                       ${thisCost}
                     </td>
-                    <td className="num px-3 py-1.5 text-right text-neutral-500 whitespace-nowrap">
+                    <td className="hidden md:table-cell num px-3 py-1.5 text-right text-neutral-500 whitespace-nowrap">
                       {nextCost != null ? `$${nextCost}` : '—'}
                     </td>
                     <td className="px-3 py-1.5">
@@ -247,7 +247,8 @@ export default function ContractsEditor({
           </table>
         </div>
 
-        <div className="px-4 py-3 border-t border-neutral-800 flex items-center justify-between">
+        {/* Desktop save bar */}
+        <div className="hidden md:flex px-4 py-3 border-t border-neutral-800 items-center justify-between">
           <span className="text-xs text-neutral-600">
             Save applies all unsaved changes across all teams
           </span>
@@ -261,6 +262,20 @@ export default function ContractsEditor({
               : totalDirty > 0
                 ? `Save Changes (${totalDirty})`
                 : 'Save Changes'}
+          </button>
+        </div>
+
+        {/* Mobile save bar — fixed above tab bar */}
+        <div className="md:hidden fixed bottom-16 inset-x-0 z-40 px-4 py-3 bg-neutral-950 border-t border-neutral-800 flex items-center justify-between">
+          <span className="text-xs text-neutral-600">
+            {totalDirty > 0 ? `${totalDirty} unsaved change${totalDirty !== 1 ? 's' : ''}` : 'No changes'}
+          </span>
+          <button
+            onClick={saveChanges}
+            disabled={saveStatus === 'saving' || totalDirty === 0}
+            className="bg-[#00E5FF] text-[#0a0c10] font-semibold rounded px-6 py-2 text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            {saveStatus === 'saving' ? 'Saving…' : 'Save Changes'}
           </button>
         </div>
       </div>

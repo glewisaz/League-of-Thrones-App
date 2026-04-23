@@ -32,7 +32,7 @@ export default async function AdminPicksPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0c10] text-[#e8eaf0]">
-      <div className="max-w-4xl mx-auto px-6 py-10">
+      <div className="w-full max-w-4xl mx-auto px-4 md:px-6 py-8 md:py-10">
         <div className="mb-8">
           <p className="text-xs text-neutral-500 uppercase tracking-widest mb-1">Small Council</p>
           <h1 className="text-2xl font-bold text-[#00E5FF]">Draft Pick Inventory</h1>

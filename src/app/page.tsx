@@ -9,7 +9,7 @@ export default async function HomePage() {
   ]);
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-10">
+    <div className="w-full max-w-5xl mx-auto px-4 md:px-6 py-8 md:py-10">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-accent">The Iron Throne</h1>
         <p className="text-neutral-500 mt-1 text-sm">

@@ -58,7 +58,7 @@ export default function TransactionsFeed({
   const trimmedQuery = query.trim();
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-10">
+    <div className="w-full max-w-3xl mx-auto px-4 md:px-6 py-8 md:py-10">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-accent">The Raven</h1>
         <p className="text-neutral-500 mt-1 text-sm">
@@ -132,9 +132,9 @@ export default function TransactionsFeed({
                     const badgeClass = BADGE_CLASS[tx.transaction_type];
 
                     return (
-                      <div key={tx.id} className="flex items-center gap-3 px-4 py-3">
+                      <div key={tx.id} className="flex items-center gap-3 px-4 py-3 min-h-[44px]">
                         <span
-                          className={`shrink-0 rounded text-xs font-semibold px-2 py-0.5 ${badgeClass}`}
+                          className={`shrink-0 whitespace-nowrap rounded text-xs font-semibold px-2 py-0.5 ${badgeClass}`}
                         >
                           {tx.transaction_type.toUpperCase()}
                         </span>

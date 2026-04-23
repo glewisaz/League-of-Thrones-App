@@ -25,7 +25,7 @@ export default function AdminNav() {
   }
 
   return (
-    <nav className="flex flex-col h-full p-4">
+    <nav className="hidden md:flex flex-col h-full p-4">
       <div className="mb-6 px-1">
         <p className="text-xs text-neutral-600 uppercase tracking-widest font-medium">
           Small Council
