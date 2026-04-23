@@ -1,5 +1,5 @@
 import { createAnonServerClient } from '@/lib/supabase/server';
-import { contractCostAtYear, nextYearCost, isExpiring } from '@/lib/contracts';
+import { contractCostAtYear, nextYearCost, nextYearCostFromCurrent, isExpiring } from '@/lib/contracts';
 import type { Team, DraftPick } from '@/types/database';
 
 export type { Team, DraftPick };
@@ -19,6 +19,7 @@ interface ContractRow {
   id: string;
   year_one_price: number;
   contract_year: number;
+  current_season_cost: number | null;
   players: { name: string; position: string | null; nfl_team: string | null } | null;
   unmatched_players: { raw_name: string; position: string | null } | null;
 }
@@ -48,21 +49,31 @@ export async function getTeamRoster(teamId: string): Promise<RosterEntry[]> {
   const supabase = createAnonServerClient();
   const { data, error } = await supabase
     .from('contracts')
-    .select('id, year_one_price, contract_year, players(name, position, nfl_team), unmatched_players(raw_name, position)')
+    .select('id, year_one_price, contract_year, current_season_cost, players(name, position, nfl_team), unmatched_players(raw_name, position)')
     .eq('current_team_id', teamId)
     .eq('status', 'active');
   if (error) throw error;
 
-  return ((data ?? []) as unknown as ContractRow[]).map((row) => ({
-    id: row.id,
-    player_name: row.players?.name ?? row.unmatched_players?.raw_name ?? 'Unknown',
-    position: row.players?.position ?? row.unmatched_players?.position ?? null,
-    year_one_price: row.year_one_price,
-    contract_year: row.contract_year,
-    current_year_cost: contractCostAtYear(row.year_one_price, row.contract_year) ?? 0,
-    next_year_cost: nextYearCost(row.year_one_price, row.contract_year),
-    is_expiring: isExpiring(row.contract_year),
-  }));
+  return ((data ?? []) as unknown as ContractRow[]).map((row) => {
+    const currentCost =
+      row.current_season_cost != null
+        ? row.current_season_cost
+        : (contractCostAtYear(row.year_one_price, row.contract_year) ?? 0);
+    const nextCost =
+      row.current_season_cost != null
+        ? nextYearCostFromCurrent(row.current_season_cost, row.contract_year)
+        : nextYearCost(row.year_one_price, row.contract_year);
+    return {
+      id: row.id,
+      player_name: row.players?.name ?? row.unmatched_players?.raw_name ?? 'Unknown',
+      position: row.players?.position ?? row.unmatched_players?.position ?? null,
+      year_one_price: row.year_one_price,
+      contract_year: row.contract_year,
+      current_year_cost: currentCost,
+      next_year_cost: nextCost,
+      is_expiring: isExpiring(row.contract_year),
+    };
+  });
 }
 
 export interface DraftPickWithTeams extends DraftPick {
@@ -90,13 +101,21 @@ export async function getAllCapByTeam(): Promise<Record<string, number>> {
   const supabase = createAnonServerClient();
   const { data, error } = await supabase
     .from('contracts')
-    .select('current_team_id, year_one_price, contract_year')
+    .select('current_team_id, year_one_price, contract_year, current_season_cost')
     .eq('status', 'active');
   if (error) throw error;
 
   const caps: Record<string, number> = {};
-  for (const row of (data ?? []) as Array<{ current_team_id: string; year_one_price: number; contract_year: number }>) {
-    const cost = contractCostAtYear(row.year_one_price, row.contract_year) ?? 0;
+  for (const row of (data ?? []) as Array<{
+    current_team_id: string;
+    year_one_price: number;
+    contract_year: number;
+    current_season_cost: number | null;
+  }>) {
+    const cost =
+      row.current_season_cost != null
+        ? row.current_season_cost
+        : (contractCostAtYear(row.year_one_price, row.contract_year) ?? 0);
     caps[row.current_team_id] = (caps[row.current_team_id] ?? 0) + cost;
   }
   return caps;

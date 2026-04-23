@@ -17,7 +17,7 @@ export default async function AdminContractsPage() {
       admin
         .from('contracts')
         .select(
-          'id, year_one_price, contract_year, acquisition_type, status, current_team_id, players(name, position), unmatched_players(raw_name, position)',
+          'id, year_one_price, contract_year, current_season_cost, acquisition_type, status, current_team_id, players(name, position), unmatched_players(raw_name, position)',
         )
         .order('current_team_id'),
       admin.from('teams').select('id, name, owner_name').order('owner_name'),

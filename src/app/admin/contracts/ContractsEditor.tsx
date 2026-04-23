@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { contractCostAtYear, nextYearCost } from '@/lib/contracts';
+import { nextYearCostFromCurrent, nextYearCost } from '@/lib/contracts';
 import type { AcquisitionType, ContractStatus } from '@/types/database';
 
 export type ContractRow = {
   id: string;
   year_one_price: number;
   contract_year: number;
+  current_season_cost: number | null;
   acquisition_type: AcquisitionType;
   status: ContractStatus;
   current_team_id: string;
@@ -17,7 +18,7 @@ export type ContractRow = {
 
 export type TeamOption = { id: string; name: string | null; owner_name: string };
 
-type EditableFields = Pick<ContractRow, 'year_one_price' | 'contract_year' | 'acquisition_type' | 'status'>;
+type EditableFields = Pick<ContractRow, 'current_season_cost' | 'contract_year' | 'acquisition_type' | 'status'>;
 
 const ACQ_TYPES: AcquisitionType[] = ['auction', 'waiver', 'free_agent', 'rookie_draft', 'trade_inherited'];
 const STATUSES: ContractStatus[] = ['active', 'dropped', 'expired'];
@@ -66,9 +67,9 @@ export default function ContractsEditor({
 
     const toSave = contracts
       .filter((c) => dirtyIds.has(c.id))
-      .map(({ id, year_one_price, acquisition_type, contract_year, status }) => ({
+      .map(({ id, current_season_cost, acquisition_type, contract_year, status }) => ({
         id,
-        year_one_price,
+        current_season_cost,
         acquisition_type,
         contract_year,
         status,
@@ -140,7 +141,7 @@ export default function ContractsEditor({
                 <th className="hidden md:table-cell text-left px-3 py-2 font-medium">Acquisition</th>
                 <th className="hidden md:table-cell text-right px-3 py-2 font-medium">Y1 $</th>
                 <th className="text-center px-3 py-2 font-medium">Yr</th>
-                <th className="text-right px-3 py-2 font-medium">Now</th>
+                <th className="text-right px-3 py-2 font-medium">2025 Cost</th>
                 <th className="hidden md:table-cell text-right px-3 py-2 font-medium">Next</th>
                 <th className="text-left px-3 py-2 font-medium">Status</th>
               </tr>
@@ -149,8 +150,10 @@ export default function ContractsEditor({
               {teamContracts.map((c) => {
                 const playerName = c.players?.name ?? c.unmatched_players?.raw_name ?? 'Unknown';
                 const position = c.players?.position ?? c.unmatched_players?.position ?? '—';
-                const thisCost = contractCostAtYear(c.year_one_price, c.contract_year) ?? 0;
-                const nextCost = nextYearCost(c.year_one_price, c.contract_year);
+                const nextCost =
+                  c.current_season_cost != null
+                    ? nextYearCostFromCurrent(c.current_season_cost, c.contract_year)
+                    : nextYearCost(c.year_one_price, c.contract_year);
                 const isDirty = dirtyIds.has(c.id);
 
                 return (
@@ -183,17 +186,8 @@ export default function ContractsEditor({
                         ))}
                       </select>
                     </td>
-                    <td className="hidden md:table-cell px-3 py-1.5 text-right">
-                      <input
-                        type="number"
-                        min={0}
-                        max={500}
-                        value={c.year_one_price}
-                        onChange={(e) =>
-                          updateField(c.id, 'year_one_price', parseInt(e.target.value, 10) || 0)
-                        }
-                        className="num w-16 bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-right text-[#e8eaf0] text-xs focus:outline-none focus:border-[#00E5FF]"
-                      />
+                    <td className="hidden md:table-cell num px-3 py-1.5 text-right text-neutral-500">
+                      ${c.year_one_price}
                     </td>
                     <td className="px-3 py-1.5 text-center">
                       <select
@@ -211,7 +205,16 @@ export default function ContractsEditor({
                       </select>
                     </td>
                     <td className="num px-3 py-1.5 text-right text-neutral-200 whitespace-nowrap">
-                      ${thisCost}
+                      <input
+                        type="number"
+                        min={0}
+                        max={500}
+                        value={c.current_season_cost ?? ''}
+                        onChange={(e) =>
+                          updateField(c.id, 'current_season_cost', parseInt(e.target.value, 10) || null)
+                        }
+                        className="num w-16 bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-right text-[#e8eaf0] text-xs focus:outline-none focus:border-[#00E5FF]"
+                      />
                     </td>
                     <td className="hidden md:table-cell num px-3 py-1.5 text-right text-neutral-500 whitespace-nowrap">
                       {nextCost != null ? `$${nextCost}` : '—'}

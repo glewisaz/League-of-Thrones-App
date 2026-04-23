@@ -50,6 +50,19 @@ export function nextYearCost(
 }
 
 /**
+ * Next-season cost derived from a known current-season cost (stored directly).
+ * Use this instead of nextYearCost() when current_season_cost is present on
+ * the contract row, so we don't re-derive from year_one_price.
+ */
+export function nextYearCostFromCurrent(
+  currentSeasonCost: number,
+  currentYear: number,
+): number | null {
+  if (currentYear >= MAX_CONTRACT_YEARS) return null;
+  return Math.round((currentSeasonCost + KEEPER_INCREMENT) * KEEPER_MULTIPLIER);
+}
+
+/**
  * True if this is the last season the player can be kept under this contract.
  */
 export function isExpiring(currentYear: number): boolean {

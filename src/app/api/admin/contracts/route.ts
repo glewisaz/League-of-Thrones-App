@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 
 type ContractUpdate = {
   id: string;
-  year_one_price: number;
+  current_season_cost: number | null;
   acquisition_type: string;
   contract_year: number;
   status: string;
@@ -27,10 +27,10 @@ export async function PATCH(request: Request) {
   const admin = createAdminClient();
   const errors: string[] = [];
 
-  for (const { id, year_one_price, acquisition_type, contract_year, status } of contracts) {
+  for (const { id, current_season_cost, acquisition_type, contract_year, status } of contracts) {
     const { error } = await admin
       .from('contracts')
-      .update({ year_one_price, acquisition_type, contract_year, status })
+      .update({ current_season_cost, acquisition_type, contract_year, status })
       .eq('id', id);
     if (error) errors.push(`${id}: ${error.message}`);
   }
