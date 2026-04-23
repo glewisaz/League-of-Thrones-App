@@ -5,6 +5,7 @@ import {
   getTeamRoster,
   getDraftPicksForTeam,
   getActiveAuctionCap,
+  type DraftPickWithTeams,
 } from '@/lib/queries/teams';
 
 const POSITION_ORDER: Record<string, number> = { QB: 1, RB: 2, WR: 3, TE: 4, K: 5, DST: 6 };
@@ -110,22 +111,29 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-neutral-800 text-neutral-500 text-xs uppercase tracking-wide">
-                  <th className="text-left px-4 py-3 font-medium">Season</th>
+                  <th className="text-left px-4 py-3 font-medium">Pick</th>
                   <th className="text-left px-4 py-3 font-medium">Type</th>
                   <th className="text-left px-4 py-3 font-medium">Notes</th>
                 </tr>
               </thead>
               <tbody>
-                {picks.map((pick) => (
-                  <tr
-                    key={pick.id}
-                    className="border-b border-neutral-800/50 last:border-0"
-                  >
-                    <td className="num px-4 py-3 text-neutral-300">{pick.season}</td>
-                    <td className="px-4 py-3 text-neutral-400 capitalize">{pick.pick_type}</td>
-                    <td className="px-4 py-3 text-neutral-500">{pick.notes ?? '—'}</td>
-                  </tr>
-                ))}
+                {picks.map((pick: DraftPickWithTeams) => {
+                  const traded = pick.original_team_id !== pick.current_team_id;
+                  const origName = pick.original_team?.name;
+                  const label = traded && origName
+                    ? `${pick.season} Round ${pick.round} (via ${origName})`
+                    : `${pick.season} Round ${pick.round}`;
+                  return (
+                    <tr
+                      key={pick.id}
+                      className="border-b border-neutral-800/50 last:border-0"
+                    >
+                      <td className="num px-4 py-3 text-neutral-300">{label}</td>
+                      <td className="px-4 py-3 text-neutral-400 capitalize">{pick.pick_type}</td>
+                      <td className="px-4 py-3 text-neutral-500">{pick.notes ?? '—'}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

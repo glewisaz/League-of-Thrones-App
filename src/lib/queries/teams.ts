@@ -65,16 +65,25 @@ export async function getTeamRoster(teamId: string): Promise<RosterEntry[]> {
   }));
 }
 
-export async function getDraftPicksForTeam(teamId: string): Promise<DraftPick[]> {
+export interface DraftPickWithTeams extends DraftPick {
+  original_team: { name: string | null } | null;
+  current_team: { name: string | null } | null;
+}
+
+export async function getDraftPicksForTeam(teamId: string): Promise<DraftPickWithTeams[]> {
   const supabase = createAnonServerClient();
   const { data, error } = await supabase
     .from('draft_picks')
-    .select('*')
+    .select(`
+      *,
+      original_team:teams!draft_picks_original_team_id_fkey(name),
+      current_team:teams!draft_picks_current_team_id_fkey(name)
+    `)
     .eq('current_team_id', teamId)
     .eq('is_used', false)
     .order('season');
   if (error) throw error;
-  return (data ?? []) as DraftPick[];
+  return (data ?? []) as unknown as DraftPickWithTeams[];
 }
 
 export async function getAllCapByTeam(): Promise<Record<string, number>> {
