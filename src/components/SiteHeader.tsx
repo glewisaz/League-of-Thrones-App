@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 const NAV_LINKS = [
   { href: '/', label: 'Teams' },
   { href: '/transactions', label: 'The Raven' },
+  { href: '/record-book', label: 'The White Book' },
 ];
 
 export default function SiteHeader() {
