@@ -23,35 +23,39 @@ export interface ParsedTransaction {
 function parseTransactionData(
   tdRaw: unknown,
   txType: string,
-): { resolvedType: 'add' | 'drop' | 'trade' | 'commish'; teamKey: string | null } {
+): { resolvedType: 'add' | 'drop' | 'trade' | 'commish'; teamKey: string | null; faabSpent: number | null } {
   if (txType === 'trade') {
-    const td = Array.isArray(tdRaw) ? tdRaw[0] : tdRaw;
-    const rec = (td && typeof td === 'object' ? td : {}) as Record<string, unknown>;
+    const td = (Array.isArray(tdRaw) ? tdRaw[0] : tdRaw) as Record<string, unknown> | undefined;
     return {
       resolvedType: 'trade',
-      teamKey: (rec.destination_team_key as string | undefined) ?? null,
+      teamKey: (td?.destination_team_key as string | undefined) ?? null,
+      faabSpent: null,
     };
   }
 
   if (Array.isArray(tdRaw)) {
-    // add: transaction_data is an array
-    const td = (tdRaw[0] ?? {}) as Record<string, unknown>;
+    // add: transaction_data is an array; team is the destination
+    const data = (tdRaw[0] ?? {}) as Record<string, unknown>;
+    const faabRaw = data.faab_bid_amount;
+    const faab = faabRaw != null ? Number(faabRaw) : null;
     return {
       resolvedType: 'add',
-      teamKey: (td.destination_team_key as string | undefined) ?? null,
+      teamKey: (data.destination_team_key as string | undefined) ?? null,
+      faabSpent: faab != null && !isNaN(faab) ? faab : null,
     };
   }
 
   if (tdRaw && typeof tdRaw === 'object') {
-    // drop: transaction_data is an object
-    const td = tdRaw as Record<string, unknown>;
+    // drop: transaction_data is an object; team is the source
+    const data = tdRaw as Record<string, unknown>;
     return {
       resolvedType: 'drop',
-      teamKey: (td.source_team_key as string | undefined) ?? null,
+      teamKey: (data.source_team_key as string | undefined) ?? null,
+      faabSpent: null,
     };
   }
 
-  return { resolvedType: 'commish', teamKey: null };
+  return { resolvedType: 'commish', teamKey: null, faabSpent: null };
 }
 
 export async function fetchAllTransactions(leagueKey: string): Promise<ParsedTransaction[]> {
@@ -137,7 +141,7 @@ export async function fetchAllTransactions(leagueKey: string): Promise<ParsedTra
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const tdWrapper = playerArr[1] as any;
-        const { resolvedType, teamKey } = parseTransactionData(
+        const { resolvedType, teamKey, faabSpent } = parseTransactionData(
           tdWrapper?.transaction_data,
           txType,
         );
@@ -147,7 +151,7 @@ export async function fetchAllTransactions(leagueKey: string): Promise<ParsedTra
           transaction_type: resolvedType,
           player_id: playerKey ?? null,
           team_key: teamKey,
-          faab_spent: faab,
+          faab_spent: faabSpent ?? faab,
           week,
           season: SEASON,
           created_at: createdAt,
