@@ -114,11 +114,26 @@ export async function fetchAllTransactions(leagueKey: string): Promise<ParsedTra
         const playerArr = (playerItem as any).player as unknown[] | undefined;
         if (!Array.isArray(playerArr)) return;
 
-        // player[0] — flat info array; player[1] — { transaction_data: array | object }
+        // playerArr[0] is the outer wrapper array of single-key info objects.
+        // playerArr[0][0] == { player_key }, playerArr[0][1] == { name }, etc.
+        // playerArr[1] holds { transaction_data }.
         const playerInfoArr = playerArr[0] as unknown[];
-        const playerKey = Array.isArray(playerInfoArr)
-          ? (findInArray(playerInfoArr, 'player_key') as string | undefined)
-          : undefined;
+        const flatInfo = Array.isArray(playerInfoArr) ? playerInfoArr : [];
+
+        const playerKey = findInArray(flatInfo, 'player_key') as string | undefined;
+        const nameRaw = findInArray(flatInfo, 'name');
+        const playerName =
+          typeof nameRaw === 'string'
+            ? nameRaw
+            : (nameRaw as { full?: string } | undefined)?.full ?? null;
+        const displayPosition = findInArray(flatInfo, 'display_position') as string | undefined;
+
+        if (!playerKey) {
+          console.warn(
+            `[transactions] no player_key for ${txKey}_p${idx}` +
+              ` type=${txType} position=${displayPosition ?? '?'} name=${playerName ?? '?'}`,
+          );
+        }
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const tdWrapper = playerArr[1] as any;
