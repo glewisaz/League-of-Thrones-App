@@ -1,6 +1,8 @@
 import { Syne } from 'next/font/google';
 import { createAnonServerClient } from '@/lib/supabase/server';
 
+export const revalidate = 3600;
+
 export const metadata = {
   title: 'The White Book · League of Thrones',
 };
@@ -76,7 +78,7 @@ export default async function RecordBookPage() {
       {/* ── Section 1: Championship History ── */}
       <section className="mb-12">
         <h2 className="text-lg font-semibold text-neutral-200 mb-4 flex items-center gap-2">
-          <span className="text-yellow-400">⚽</span> The Iron Football — Championship History
+          <span className="text-yellow-400">🏈</span> The Iron Football — Championship History
         </h2>
 
         {champions.length === 0 ? (
