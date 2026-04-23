@@ -44,10 +44,16 @@ export async function GET() {
       return NextResponse.json({ ok: true, transactions_synced: 0 });
     }
 
-    // Only set player_id FK if the player actually exists in the players table
-    const uniquePlayerIds = [
-      ...new Set(transactions.map((t) => t.player_id).filter(Boolean) as string[]),
-    ];
+    // Collect unique player_ids with the first name/position seen for each
+    const playerMeta = new Map<string, { name: string; position: string | null }>();
+    for (const tx of transactions) {
+      if (tx.player_id && tx.player_name && !playerMeta.has(tx.player_id)) {
+        playerMeta.set(tx.player_id, { name: tx.player_name, position: tx.player_position });
+      }
+    }
+
+    // Find which player_ids are already in the players table
+    const uniquePlayerIds = [...playerMeta.keys()];
     const existingPlayerIds = new Set<string>();
     if (uniquePlayerIds.length > 0) {
       const { data: existing } = await supabase
@@ -56,6 +62,27 @@ export async function GET() {
         .in('yahoo_player_id', uniquePlayerIds);
       for (const p of existing ?? []) {
         existingPlayerIds.add((p as { yahoo_player_id: string }).yahoo_player_id);
+      }
+    }
+
+    // Upsert minimal player records for any player_id not yet in the table
+    const missingPlayers = uniquePlayerIds
+      .filter((id) => !existingPlayerIds.has(id))
+      .map((id) => ({
+        yahoo_player_id: id,
+        name: playerMeta.get(id)!.name,
+        position: playerMeta.get(id)!.position,
+        nfl_team: null,
+      }));
+
+    if (missingPlayers.length > 0) {
+      const { error: playerUpsertError } = await supabase
+        .from('players')
+        .upsert(missingPlayers, { onConflict: 'yahoo_player_id' });
+      if (playerUpsertError) {
+        console.error('[sync-transactions] player upsert error:', playerUpsertError.message);
+      } else {
+        for (const p of missingPlayers) existingPlayerIds.add(p.yahoo_player_id);
       }
     }
 
@@ -92,6 +119,7 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       transactions_synced: synced,
+      players_created: missingPlayers.length,
       team_keys_in_db: [...teamKeyMap.keys()],
       team_keys_in_transactions: uniqueTeamKeys,
       ...(errors.length > 0 && { errors }),

@@ -8,6 +8,8 @@ export interface ParsedTransaction {
   yahoo_transaction_id: string;
   transaction_type: 'add' | 'drop' | 'trade' | 'commish';
   player_id: string | null;
+  player_name: string | null;
+  player_position: string | null;
   team_key: string | null;
   faab_spent: number | null;
   week: number | null;
@@ -150,6 +152,8 @@ export async function fetchAllTransactions(leagueKey: string): Promise<ParsedTra
           yahoo_transaction_id: `${txKey}_p${idx}`,
           transaction_type: resolvedType,
           player_id: playerKey ?? null,
+          player_name: playerName,
+          player_position: displayPosition ?? null,
           team_key: teamKey,
           faab_spent: faabSpent ?? faab,
           week,
