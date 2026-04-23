@@ -25,13 +25,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${figtree.variable} ${dmMono.variable} h-full`}>
       <body className="min-h-full flex flex-col antialiased">
         <header className="border-b border-neutral-800 px-6 py-4">
-          <div className="max-w-5xl mx-auto">
+          <div className="max-w-5xl mx-auto flex items-center justify-between">
             <Link
               href="/"
               className="text-xl font-semibold tracking-tight text-accent hover:text-accent/80 transition-colors"
             >
               ♛ League of Thrones
             </Link>
+            <nav className="flex items-center gap-6 text-sm">
+              <Link
+                href="/transactions"
+                className="text-neutral-400 hover:text-neutral-200 transition-colors"
+              >
+                The Raven
+              </Link>
+            </nav>
           </div>
         </header>
         <main className="flex-1">{children}</main>

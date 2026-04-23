@@ -56,6 +56,7 @@ export interface Team {
   conference: Conference | null;
   slug: string;
   logo_url: string | null;
+  yahoo_team_key: string | null;
   created_at: string;
 }
 

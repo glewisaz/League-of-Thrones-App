@@ -49,6 +49,8 @@ export async function GET() {
       const name = findInArray(info, 'name') as string | undefined;
       if (!name) continue;
 
+      const teamKey = findInArray(info, 'team_key') as string | undefined;
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const logosArr = findInArray(info, 'team_logos') as any;
       // Yahoo returns team_logos as [{team_logo:{url:...}}]
@@ -57,7 +59,7 @@ export async function GET() {
       const slug = slugify(name);
 
       const { error } = await supabase.from('teams').upsert(
-        { name, owner_name: '', conference: 'north', slug, logo_url: logoUrl },
+        { name, owner_name: '', conference: 'north', slug, logo_url: logoUrl, yahoo_team_key: teamKey ?? null },
         { onConflict: 'slug' },
       );
 
