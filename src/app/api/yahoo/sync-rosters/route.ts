@@ -98,8 +98,12 @@ export async function GET() {
         const playerKey = findInArray(playerInfo, 'player_key') as string | undefined;
         if (!playerKey) continue;
 
-        const nameObj = findInArray(playerInfo, 'name') as { full?: string } | undefined;
-        const name = nameObj?.full;
+        const nameRaw = findInArray(playerInfo, 'name');
+        const name =
+          typeof nameRaw === 'string'
+            ? nameRaw
+            : (nameRaw as { full?: string } | undefined)?.full ??
+              (findInArray(playerInfo, 'editorial_team_full_name') as string | undefined);
         if (!name) continue;
 
         const position = (findInArray(playerInfo, 'display_position') as string) ?? null;
@@ -118,7 +122,9 @@ export async function GET() {
         }
         playersUpserted++;
 
-        if (!existingPlayerIds.has(playerKey)) {
+        // DEF/ST units are not keeper assets — skip contract creation
+        const isDef = position === 'DEF';
+        if (!isDef && !existingPlayerIds.has(playerKey)) {
           const { error: contractError } = await supabase.from('contracts').insert({
             player_id: playerKey,
             current_team_id: teamRow.id,
