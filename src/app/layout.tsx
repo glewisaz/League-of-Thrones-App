@@ -35,8 +35,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
         <main className="flex-1">{children}</main>
-        <footer className="border-t border-neutral-800 px-6 py-4 text-center text-xs text-neutral-600">
-          League of Thrones · 2025 Season
+        <footer className="border-t border-neutral-800 px-6 py-4 text-xs text-neutral-600 flex items-center justify-between">
+          <span>League of Thrones · 2025 Season</span>
+          <Link href="/admin/login" className="text-neutral-800 hover:text-neutral-700 transition-colors">
+            Small Council
+          </Link>
         </footer>
       </body>
     </html>
