@@ -19,6 +19,7 @@ interface ContractRow {
   id: string;
   year_one_price: number;
   contract_year: number;
+  players: { name: string; position: string | null; nfl_team: string | null } | null;
   unmatched_players: { raw_name: string; position: string | null } | null;
 }
 
@@ -47,15 +48,15 @@ export async function getTeamRoster(teamId: string): Promise<RosterEntry[]> {
   const supabase = createAnonServerClient();
   const { data, error } = await supabase
     .from('contracts')
-    .select('id, year_one_price, contract_year, unmatched_players(raw_name, position)')
+    .select('id, year_one_price, contract_year, players(name, position, nfl_team), unmatched_players(raw_name, position)')
     .eq('current_team_id', teamId)
     .eq('status', 'active');
   if (error) throw error;
 
   return ((data ?? []) as unknown as ContractRow[]).map((row) => ({
     id: row.id,
-    player_name: row.unmatched_players?.raw_name ?? 'Unknown',
-    position: row.unmatched_players?.position ?? null,
+    player_name: row.players?.name ?? row.unmatched_players?.raw_name ?? 'Unknown',
+    position: row.players?.position ?? row.unmatched_players?.position ?? null,
     year_one_price: row.year_one_price,
     contract_year: row.contract_year,
     current_year_cost: contractCostAtYear(row.year_one_price, row.contract_year) ?? 0,
