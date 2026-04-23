@@ -1,5 +1,7 @@
 import { createAnonServerClient } from '@/lib/supabase/server';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: 'The Raven · League of Thrones',
 };
@@ -40,8 +42,8 @@ export default async function TransactionsPage() {
     .from('transactions')
     .select(`
       id, transaction_type, week, season, faab_spent, created_at,
-      player:players!transactions_player_id_fkey(name, position),
-      team:teams!transactions_team_id_fkey(name, owner_name)
+      player:players!left(name, position),
+      team:teams!left(name, owner_name)
     `)
     .order('created_at', { ascending: false })
     .limit(50);
