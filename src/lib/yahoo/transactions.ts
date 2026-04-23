@@ -16,40 +16,42 @@ export interface ParsedTransaction {
   raw_payload: unknown;
 }
 
-function extractWeek(transactionKey: string): number | null {
-  const match = transactionKey.match(/\.w\.(\d+)\./);
-  return match ? parseInt(match[1], 10) : null;
-}
-
+// transaction_data shape determines type:
+//   array  → add  (destination_team_key)
+//   object → drop (source_team_key)
+//   trade always uses destination_team_key regardless of shape
 function parseTransactionData(
   tdRaw: unknown,
   txType: string,
-): { resolvedType: 'add' | 'drop' | 'trade' | 'commish'; teamKey: string | null; faab: number | null } {
+): { resolvedType: 'add' | 'drop' | 'trade' | 'commish'; teamKey: string | null } {
   if (txType === 'trade') {
     const td = Array.isArray(tdRaw) ? tdRaw[0] : tdRaw;
     const rec = (td && typeof td === 'object' ? td : {}) as Record<string, unknown>;
-    const teamKey = (rec.destination_team_key as string | undefined) ?? null;
-    return { resolvedType: 'trade', teamKey, faab: null };
+    return {
+      resolvedType: 'trade',
+      teamKey: (rec.destination_team_key as string | undefined) ?? null,
+    };
   }
 
-  const td = Array.isArray(tdRaw) ? tdRaw[0] : tdRaw;
-  const rec = (td && typeof td === 'object' ? td : {}) as Record<string, unknown>;
-  const tdType = (rec.type as string) ?? '';
+  if (Array.isArray(tdRaw)) {
+    // add: transaction_data is an array
+    const td = (tdRaw[0] ?? {}) as Record<string, unknown>;
+    return {
+      resolvedType: 'add',
+      teamKey: (td.destination_team_key as string | undefined) ?? null,
+    };
+  }
 
-  const resolvedType: 'add' | 'drop' | 'commish' =
-    tdType === 'add' ? 'add' : tdType === 'drop' ? 'drop' : 'commish';
+  if (tdRaw && typeof tdRaw === 'object') {
+    // drop: transaction_data is an object
+    const td = tdRaw as Record<string, unknown>;
+    return {
+      resolvedType: 'drop',
+      teamKey: (td.source_team_key as string | undefined) ?? null,
+    };
+  }
 
-  // For adds: team acquiring the player is destination. For drops: source.
-  const teamKey =
-    tdType === 'add'
-      ? ((rec.destination_team_key as string | undefined) ?? null)
-      : ((rec.source_team_key as string | undefined) ?? null);
-
-  const faabRaw = rec.faab_bid_amount;
-  const faabParsed = faabRaw != null ? parseInt(faabRaw as string, 10) : NaN;
-  const faab = isNaN(faabParsed) ? null : faabParsed;
-
-  return { resolvedType, teamKey, faab };
+  return { resolvedType: 'commish', teamKey: null };
 }
 
 export async function fetchAllTransactions(leagueKey: string): Promise<ParsedTransaction[]> {
@@ -77,9 +79,13 @@ export async function fetchAllTransactions(leagueKey: string): Promise<ParsedTra
       if (!item || typeof item !== 'object') continue;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const txArr = (item as any).transaction as unknown[] | undefined;
-      if (!Array.isArray(txArr) || !txArr[0]) continue;
+      if (!Array.isArray(txArr) || txArr.length < 2) continue;
 
+      // transaction[0] — metadata: key, type, timestamp, faab_bid
+      // transaction[1] — body: { players: { "0": ..., "1": ..., count: N } }
       const txMeta = txArr[0] as Record<string, unknown>;
+      const txBody = txArr[1] as Record<string, unknown>;
+
       const txKey = txMeta.transaction_key as string | undefined;
       if (!txKey) continue;
 
@@ -88,9 +94,16 @@ export async function fetchAllTransactions(leagueKey: string): Promise<ParsedTra
       const createdAt = timestamp
         ? new Date(parseInt(timestamp, 10) * 1000).toISOString()
         : new Date().toISOString();
-      const week = extractWeek(txKey);
 
-      const playersObj = txMeta.players as Record<string, unknown> | undefined;
+      // FAAB is at the top level of the transaction metadata, not inside transaction_data
+      const faabRaw = txMeta.faab_bid;
+      const faabParsed = faabRaw != null ? parseInt(faabRaw as string, 10) : NaN;
+      const faab = isNaN(faabParsed) ? null : faabParsed;
+
+      // Key format is "461.l.708208.tr.474" — no week number embedded
+      const week: number | null = null;
+
+      const playersObj = txBody?.players as Record<string, unknown> | undefined;
       if (!playersObj) continue;
 
       const players = iterateYahooObject(playersObj);
@@ -101,7 +114,7 @@ export async function fetchAllTransactions(leagueKey: string): Promise<ParsedTra
         const playerArr = (playerItem as any).player as unknown[] | undefined;
         if (!Array.isArray(playerArr)) return;
 
-        // playerArr[0] is the flat player info array; playerArr[1] has transaction_data
+        // player[0] — flat info array; player[1] — { transaction_data: array | object }
         const playerInfoArr = playerArr[0] as unknown[];
         const playerKey = Array.isArray(playerInfoArr)
           ? (findInArray(playerInfoArr, 'player_key') as string | undefined)
@@ -109,7 +122,7 @@ export async function fetchAllTransactions(leagueKey: string): Promise<ParsedTra
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const tdWrapper = playerArr[1] as any;
-        const { resolvedType, teamKey, faab } = parseTransactionData(
+        const { resolvedType, teamKey } = parseTransactionData(
           tdWrapper?.transaction_data,
           txType,
         );
@@ -128,6 +141,7 @@ export async function fetchAllTransactions(leagueKey: string): Promise<ParsedTra
       });
     }
 
+    // Stop when Yahoo returns a partial page — we've exhausted all results
     if (txItems.length < BATCH_SIZE) break;
     start += BATCH_SIZE;
   }
