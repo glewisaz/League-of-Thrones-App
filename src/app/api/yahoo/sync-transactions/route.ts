@@ -22,18 +22,24 @@ export async function GET() {
     // Build yahoo_team_key → team UUID map for resolving team_id
     const { data: teams, error: teamsError } = await supabase
       .from('teams')
-      .select('id, yahoo_team_key');
+      .select('id, owner_name, yahoo_team_key');
     if (teamsError) throw teamsError;
+
+    console.log('Teams with yahoo_team_key:', JSON.stringify(teams));
 
     const teamKeyMap = new Map<string, string>();
     for (const t of teams ?? []) {
-      const row = t as { id: string; yahoo_team_key: string | null };
+      const row = t as { id: string; owner_name: string; yahoo_team_key: string | null };
       if (row.yahoo_team_key) teamKeyMap.set(row.yahoo_team_key, row.id);
     }
 
     const transactions = await fetchAllTransactions(auth.league_key);
     console.log('Raw transactions fetched:', transactions.length);
     console.log('First transaction sample:', JSON.stringify(transactions[0], null, 2));
+
+    // Log unique team keys from transactions so we can compare to what's stored
+    const uniqueTeamKeys = [...new Set(transactions.map((t) => t.team_key).filter(Boolean))];
+    console.log('Unique team_keys in transactions:', JSON.stringify(uniqueTeamKeys));
     if (transactions.length === 0) {
       return NextResponse.json({ ok: true, transactions_synced: 0 });
     }
@@ -86,6 +92,8 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       transactions_synced: synced,
+      team_keys_in_db: [...teamKeyMap.keys()],
+      team_keys_in_transactions: uniqueTeamKeys,
       ...(errors.length > 0 && { errors }),
     });
   } catch (err) {
