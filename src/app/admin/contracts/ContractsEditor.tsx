@@ -22,6 +22,7 @@ type EditableFields = Pick<ContractRow, 'current_season_cost' | 'contract_year' 
 
 const ACQ_TYPES: AcquisitionType[] = ['auction', 'waiver', 'free_agent', 'rookie_draft', 'trade_inherited'];
 const STATUSES: ContractStatus[] = ['active', 'dropped', 'expired'];
+const POSITION_ORDER: Record<string, number> = { QB: 1, WR: 2, RB: 3, TE: 4, DEF: 5 };
 
 function teamLabel(t: TeamOption) {
   return t.name ?? t.owner_name;
@@ -55,9 +56,10 @@ export default function ContractsEditor({
       contracts
         .filter((c) => c.current_team_id === selectedTeamId)
         .sort((a, b) => {
-          const nameA = a.players?.name ?? a.unmatched_players?.raw_name ?? '';
-          const nameB = b.players?.name ?? b.unmatched_players?.raw_name ?? '';
-          return nameA.localeCompare(nameB);
+          const posA = POSITION_ORDER[a.players?.position ?? ''] ?? 99;
+          const posB = POSITION_ORDER[b.players?.position ?? ''] ?? 99;
+          if (posA !== posB) return posA - posB;
+          return (b.current_season_cost ?? 0) - (a.current_season_cost ?? 0);
         }),
     [contracts, selectedTeamId],
   );
