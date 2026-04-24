@@ -93,6 +93,14 @@ export async function GET() {
       }
     }
 
+    // Check feature flag before any contract-creation logic runs
+    const { data: contractFlag } = await supabase
+      .from('feature_flags')
+      .select('enabled')
+      .eq('key', 'auto_create_contracts_on_sync')
+      .maybeSingle();
+    const autoCreateContracts = contractFlag?.enabled === true;
+
     let synced = 0;
     const errors: string[] = [];
 
@@ -127,6 +135,7 @@ export async function GET() {
       ok: true,
       transactions_synced: synced,
       players_created: missingPlayers.length,
+      auto_create_contracts: autoCreateContracts,
       team_keys_in_db: [...teamKeyMap.keys()],
       team_keys_in_transactions: uniqueTeamKeys,
       ...(errors.length > 0 && { errors }),

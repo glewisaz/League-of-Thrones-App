@@ -8,6 +8,7 @@ import {
   FileText,
   Calendar,
   ArrowLeftRight,
+  Settings,
 } from 'lucide-react';
 
 const TABS = [
@@ -16,6 +17,7 @@ const TABS = [
   { href: '/admin/contracts', label: 'Contracts', Icon: FileText        },
   { href: '/admin/picks',     label: 'Picks',     Icon: Calendar        },
   { href: '/admin/trades',    label: 'Trades',    Icon: ArrowLeftRight  },
+  { href: '/admin/controls',  label: 'Controls',  Icon: Settings        },
 ];
 
 export default function AdminTabBar() {
