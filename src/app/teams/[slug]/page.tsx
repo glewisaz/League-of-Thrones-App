@@ -1,7 +1,5 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-
-export const dynamic = 'force-dynamic';
 import {
   getTeamBySlug,
   getTeamRoster,
@@ -9,6 +7,8 @@ import {
   type DraftPickWithTeams,
 } from '@/lib/queries/teams';
 import { getActiveSeason } from '@/lib/queries/seasons';
+
+export const dynamic = 'force-dynamic';
 
 const POSITION_ORDER: Record<string, number> = { QB: 1, RB: 2, WR: 3, TE: 4, K: 5, DST: 6 };
 
@@ -41,6 +41,7 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
     getDraftPicksForTeam(team.id),
     getActiveSeason(),
   ]);
+  console.log('Roster count:', roster.length, roster.slice(0, 3).map(r => r.player_name));
   const auctionCap = season?.auction_cap ?? 200;
   const seasonYear = season?.year ?? new Date().getFullYear();
 
