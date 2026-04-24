@@ -3,7 +3,8 @@ import { Syne } from 'next/font/google';
 import { createAnonServerClient } from '@/lib/supabase/server';
 import { getAllTeams, getAllCapByTeam } from '@/lib/queries/teams';
 import { getActiveSeason } from '@/lib/queries/seasons';
-import { getLeagueKey, fetchYahooPlayers, yahooPlayerUrl, type YahooPlayer } from '@/lib/yahoo/players';
+import { getDynastyFreeAgents, type DynastyFreeAgent } from '@/lib/queries/dynasty';
+import { fetchRookies, type SleeperRookie } from '@/lib/sleeper/rookies';
 
 export const revalidate = 1800;
 
@@ -26,27 +27,56 @@ function CapBar({ pct }: { pct: number }) {
   );
 }
 
-function PlayerList({ players, emptyMessage }: { players: YahooPlayer[]; emptyMessage: string }) {
-  if (players.length === 0) {
-    return <p className="text-sm italic text-neutral-600">{emptyMessage}</p>;
+const POSITION_BADGE: Record<string, string> = {
+  QB: 'bg-red-900/60 text-red-300',
+  RB: 'bg-green-900/60 text-green-300',
+  WR: 'bg-blue-900/60 text-blue-300',
+  TE: 'bg-purple-900/60 text-purple-300',
+};
+
+function FreeAgentColumn({ position, players }: { position: string; players: DynastyFreeAgent[] }) {
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <span
+          className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${POSITION_BADGE[position] ?? 'bg-neutral-800 text-neutral-400'}`}
+        >
+          {position}
+        </span>
+      </div>
+      {players.length === 0 ? (
+        <p className="text-xs italic text-neutral-700">No rankings loaded</p>
+      ) : (
+        <ol className="space-y-2">
+          {players.map((p, i) => (
+            <li key={`${p.player_name}-${i}`} className="flex items-baseline gap-2">
+              <span className="num text-[11px] text-neutral-600 w-4 shrink-0 text-right">{p.rank}</span>
+              <span className="text-sm text-neutral-200 leading-snug">{p.player_name}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+function RookieList({ rookies }: { rookies: SleeperRookie[] }) {
+  if (rookies.length === 0) {
+    return <p className="text-sm italic text-neutral-600">Sleeper data unavailable.</p>;
   }
   return (
     <ol className="divide-y divide-neutral-800/60">
-      {players.map((p, i) => (
-        <li key={p.playerKey} className="flex items-center gap-3 py-2.5">
+      {rookies.map((r, i) => (
+        <li key={`${r.name}-${i}`} className="flex items-center gap-3 py-2.5">
           <span className="num text-xs text-neutral-600 w-5 shrink-0 text-right">{i + 1}</span>
+          <span
+            className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${POSITION_BADGE[r.position] ?? 'bg-neutral-800 text-neutral-400'}`}
+          >
+            {r.position}
+          </span>
           <div className="flex-1 min-w-0">
-            <a
-              href={yahooPlayerUrl(p.playerKey)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium text-neutral-100 hover:text-accent transition-colors"
-            >
-              {p.name}
-            </a>
-            <span className="ml-2 text-xs text-neutral-500">
-              {[p.position, p.nflTeam].filter(Boolean).join(' · ')}
-            </span>
+            <span className="font-medium text-neutral-100">{r.name}</span>
+            {r.team && <span className="ml-2 text-xs text-neutral-500">{r.team}</span>}
           </div>
         </li>
       ))}
@@ -57,17 +87,20 @@ function PlayerList({ players, emptyMessage }: { players: YahooPlayer[]; emptyMe
 export default async function HomePage() {
   const supabase = createAnonServerClient();
 
-  const [season, teams, capByTeam, { data: latestChampion }] = await Promise.all([
-    getActiveSeason(),
-    getAllTeams(),
-    getAllCapByTeam(),
-    supabase
-      .from('champions')
-      .select('season, champion:teams!champions_champion_team_id_fkey(name, owner_name)')
-      .order('season', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-  ]);
+  const [season, teams, capByTeam, { data: latestChampion }, freeAgents, rookies] =
+    await Promise.all([
+      getActiveSeason(),
+      getAllTeams(),
+      getAllCapByTeam(),
+      supabase
+        .from('champions')
+        .select('season, champion:teams!champions_champion_team_id_fkey(name, owner_name)')
+        .order('season', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      getDynastyFreeAgents(5).catch(() => ({ QB: [], RB: [], WR: [], TE: [] })),
+      fetchRookies().catch(() => [] as SleeperRookie[]),
+    ]);
 
   const auctionCap = season?.auction_cap ?? 200;
   const seasonYear = season?.year ?? new Date().getFullYear();
@@ -79,7 +112,6 @@ export default async function HomePage() {
     champion: { name: string | null; owner_name: string } | null;
   } | null;
 
-  // Cap room leaderboard — top 5 teams with the most available cap
   const capLeaderboard = teams
     .map((team) => {
       const committed = capByTeam[team.id] ?? 0;
@@ -89,21 +121,6 @@ export default async function HomePage() {
     })
     .sort((a, b) => b.available - a.available)
     .slice(0, 5);
-
-  // Yahoo data — degrades gracefully if Yahoo is unreachable or unconfigured
-  let freeAgents: YahooPlayer[] = [];
-  let rookies: YahooPlayer[] = [];
-  try {
-    const leagueKey = await getLeagueKey();
-    if (leagueKey) {
-      [freeAgents, rookies] = await Promise.all([
-        fetchYahooPlayers(leagueKey, 'FA'),
-        fetchYahooPlayers(leagueKey, 'R'),
-      ]);
-    }
-  } catch {
-    // Yahoo unavailable — sections render with empty state
-  }
 
   return (
     <div className="w-full max-w-5xl mx-auto px-4 md:px-6 py-10 md:py-14">
@@ -137,56 +154,51 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ── Two-column grid: Cap Room + Free Agents ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
-
-        {/* Cap Room Leaderboard */}
-        <section>
-          <h2 className={`${syne.className} text-xl font-bold text-neutral-100 mb-1`}>
-            Cap Room Available
-          </h2>
-          <p className="text-xs text-neutral-500 mb-4">Most flexibility heading into the auction</p>
-          <div className="space-y-4">
-            {capLeaderboard.map(({ team, committed, available, pct }, i) => (
-              <Link
-                key={team.id}
-                href={`/teams/${team.slug}`}
-                className="block group"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="num text-xs text-neutral-600 w-4 shrink-0">{i + 1}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="font-medium text-neutral-100 group-hover:text-accent transition-colors truncate">
-                        {team.name ?? team.owner_name}
-                      </span>
-                      <span className="num text-accent font-semibold shrink-0">${available}</span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="num text-xs text-neutral-600">${committed} used</span>
-                      <span className="text-neutral-700 text-xs">·</span>
-                      <span className="num text-xs text-neutral-600">{pct}%</span>
-                    </div>
-                    <CapBar pct={pct} />
+      {/* ── Cap Room ── */}
+      <section className="mb-10">
+        <h2 className={`${syne.className} text-xl font-bold text-neutral-100 mb-1`}>
+          Cap Room Available
+        </h2>
+        <p className="text-xs text-neutral-500 mb-4">Most flexibility heading into the auction</p>
+        <div className="space-y-4 max-w-sm">
+          {capLeaderboard.map(({ team, committed, available, pct }, i) => (
+            <Link key={team.id} href={`/teams/${team.slug}`} className="block group">
+              <div className="flex items-center gap-3">
+                <span className="num text-xs text-neutral-600 w-4 shrink-0">{i + 1}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="font-medium text-neutral-100 group-hover:text-accent transition-colors truncate">
+                      {team.name ?? team.owner_name}
+                    </span>
+                    <span className="num text-accent font-semibold shrink-0">${available}</span>
                   </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="num text-xs text-neutral-600">${committed} used</span>
+                    <span className="text-neutral-700 text-xs">·</span>
+                    <span className="num text-xs text-neutral-600">{pct}%</span>
+                  </div>
+                  <CapBar pct={pct} />
                 </div>
-              </Link>
-            ))}
-          </div>
-        </section>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
 
-        {/* Top Free Agents */}
-        <section>
-          <h2 className={`${syne.className} text-xl font-bold text-neutral-100 mb-1`}>
-            Top Free Agents
-          </h2>
-          <p className="text-xs text-neutral-500 mb-4">Best unrostered players by overall rank</p>
-          <PlayerList
-            players={freeAgents}
-            emptyMessage="Yahoo sync not configured or no free agents available."
-          />
-        </section>
-      </div>
+      {/* ── Dynasty Free Agents ── */}
+      <section className="mb-10">
+        <h2 className={`${syne.className} text-xl font-bold text-neutral-100 mb-1`}>
+          Top Free Agents
+        </h2>
+        <p className="text-xs text-neutral-500 mb-4">
+          Best unrostered players by dynasty rank
+        </p>
+        <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4 grid grid-cols-2 md:grid-cols-4 gap-6">
+          {(['QB', 'RB', 'WR', 'TE'] as const).map((pos) => (
+            <FreeAgentColumn key={pos} position={pos} players={freeAgents[pos]} />
+          ))}
+        </div>
+      </section>
 
       {/* ── Rookies ── */}
       <section>
@@ -197,10 +209,7 @@ export default async function HomePage() {
           Top prospects for the {seasonYear + 1} rookie draft
         </p>
         <div className="bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-2">
-          <PlayerList
-            players={rookies}
-            emptyMessage="Yahoo sync not configured or rookie list unavailable."
-          />
+          <RookieList rookies={rookies} />
         </div>
       </section>
 

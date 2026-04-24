@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { label: 'Picks', href: '/admin/picks' },
   { label: 'Trades', href: '/admin/trades' },
   { label: 'Yahoo Sync', href: '/admin/yahoo' },
+  { label: 'Dynasty Rankings', href: '/admin/dynasty-rankings' },
 ];
 
 export default function AdminNav() {
