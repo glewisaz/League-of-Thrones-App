@@ -19,7 +19,9 @@ export async function GET() {
       );
     }
 
-    // Build yahoo_team_key → team UUID map for resolving team_id
+    // yahoo_team_key is populated by sync-teams. If that hasn't run yet, all
+    // team_id lookups below will return null and transactions will be saved
+    // without a team association. Re-syncing after sync-teams fixes them.
     const { data: teams, error: teamsError } = await supabase
       .from('teams')
       .select('id, owner_name, yahoo_team_key');
@@ -44,7 +46,10 @@ export async function GET() {
       return NextResponse.json({ ok: true, transactions_synced: 0 });
     }
 
-    // Collect unique player_ids with the first name/position seen for each
+    // Player resolution — three steps to avoid FK violations on transaction insert:
+    //
+    // 1. Dedupe: collect one name/position per yahoo_player_id across all transactions.
+    //    We use the first occurrence; subsequent transactions for the same player are ignored.
     const playerMeta = new Map<string, { name: string; position: string | null }>();
     for (const tx of transactions) {
       if (tx.player_id && tx.player_name && !playerMeta.has(tx.player_id)) {
@@ -52,7 +57,7 @@ export async function GET() {
       }
     }
 
-    // Find which player_ids are already in the players table
+    // 2. Check existence: single batch query to find which player_ids are already in DB.
     const uniquePlayerIds = [...playerMeta.keys()];
     const existingPlayerIds = new Set<string>();
     if (uniquePlayerIds.length > 0) {
@@ -65,7 +70,9 @@ export async function GET() {
       }
     }
 
-    // Upsert minimal player records for any player_id not yet in the table
+    // 3. Batch upsert stubs for unknown players so transaction rows can reference them.
+    //    These stubs have nfl_team=null and may have incomplete position data — sync-rosters
+    //    will fill in the full details the next time it runs.
     const missingPlayers = uniquePlayerIds
       .filter((id) => !existingPlayerIds.has(id))
       .map((id) => ({

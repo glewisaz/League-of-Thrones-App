@@ -45,6 +45,17 @@ export async function getTeamBySlug(slug: string): Promise<Team | null> {
   return data as Team | null;
 }
 
+/**
+ * Load the active roster for a team with computed cost fields.
+ *
+ * The join uses implicit inner joins for players and unmatched_players.
+ * Both are optional — a contract row may have a matched player, an unmatched
+ * player, or neither if data is incomplete. PostgREST returns null for
+ * missing FK targets, which we handle in the map below.
+ *
+ * Note: we query contracts (not players) as the source of truth for who's
+ * on a roster. Yahoo owns the live roster; contracts own the cost data.
+ */
 export async function getTeamRoster(teamId: string): Promise<RosterEntry[]> {
   const supabase = createAnonServerClient();
   const { data, error } = await supabase
@@ -97,6 +108,11 @@ export async function getDraftPicksForTeam(teamId: string): Promise<DraftPickWit
   return (data ?? []) as unknown as DraftPickWithTeams[];
 }
 
+/**
+ * Compute total cap commitment per team across all active contracts.
+ * Only 'active' status is included — dropped and expired contracts don't
+ * count against the cap. Used on the home page league overview grid.
+ */
 export async function getAllCapByTeam(): Promise<Record<string, number>> {
   const supabase = createAnonServerClient();
   const { data, error } = await supabase

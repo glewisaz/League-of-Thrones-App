@@ -1,7 +1,10 @@
 import { yahooFetch } from '@/lib/yahoo/client';
 import { iterateYahooObject, findInArray } from '@/lib/yahoo/parse';
 
+// TODO: replace with getActiveSeason() once the season query is available server-side here
 const SEASON = 2025;
+
+// Yahoo's transaction endpoint caps results at 25 per page; pagination uses a start offset.
 const BATCH_SIZE = 25;
 
 export interface ParsedTransaction {
@@ -18,10 +21,17 @@ export interface ParsedTransaction {
   raw_payload: unknown;
 }
 
-// transaction_data shape determines type:
-//   array  → add  (destination_team_key)
-//   object → drop (source_team_key)
-//   trade always uses destination_team_key regardless of shape
+/**
+ * Infer the resolved transaction type and extract team key + FAAB from
+ * the per-player `transaction_data` field.
+ *
+ * Yahoo's type field says "add,drop" for waiver claims that include both
+ * sides. The shape of transaction_data disambiguates which leg this player
+ * is on for a given row:
+ *   - Array  → the player is being added   (destination_team_key, may have faab_bid_amount)
+ *   - Object → the player is being dropped (source_team_key, no FAAB)
+ * Trades always use destination_team_key regardless of shape.
+ */
 function parseTransactionData(
   tdRaw: unknown,
   txType: string,
@@ -60,6 +70,15 @@ function parseTransactionData(
   return { resolvedType: 'commish', teamKey: null, faabSpent: null };
 }
 
+/**
+ * Fetch and parse every add/drop/trade transaction for the league,
+ * paginating through Yahoo's cursor-based endpoint until exhausted.
+ *
+ * Each transaction is expanded into one ParsedTransaction per player —
+ * a two-player trade produces two rows, a waiver claim with a drop produces
+ * two rows (one add, one drop). The composite ID `{txKey}_p{idx}` keeps
+ * them distinct and idempotent on re-sync.
+ */
 export async function fetchAllTransactions(leagueKey: string): Promise<ParsedTransaction[]> {
   const all: ParsedTransaction[] = [];
   let start = 0;
@@ -87,8 +106,9 @@ export async function fetchAllTransactions(leagueKey: string): Promise<ParsedTra
       const txArr = (item as any).transaction as unknown[] | undefined;
       if (!Array.isArray(txArr) || txArr.length < 2) continue;
 
-      // transaction[0] — metadata: key, type, timestamp, faab_bid
-      // transaction[1] — body: { players: { "0": ..., "1": ..., count: N } }
+      // Yahoo splits each transaction into two elements:
+      //   txArr[0] — flat metadata: key, type, unix timestamp, top-level faab_bid
+      //   txArr[1] — body containing the numeric-key players collection
       const txMeta = txArr[0] as Record<string, unknown>;
       const txBody = txArr[1] as Record<string, unknown>;
 
@@ -120,9 +140,10 @@ export async function fetchAllTransactions(leagueKey: string): Promise<ParsedTra
         const playerArr = (playerItem as any).player as unknown[] | undefined;
         if (!Array.isArray(playerArr)) return;
 
-        // playerArr[0] is the outer wrapper array of single-key info objects.
-        // playerArr[0][0] == { player_key }, playerArr[0][1] == { name }, etc.
-        // playerArr[1] holds { transaction_data }.
+        // Each player entry has two slots:
+        //   playerArr[0] — info array: [{ player_key }, { name }, { display_position }, ...]
+        //   playerArr[1] — { transaction_data } describing this player's role in the transaction
+        // playerArr[0] is itself an array of single-key objects (Yahoo's info array convention).
         const playerInfoArr = playerArr[0] as unknown[];
         const flatInfo = Array.isArray(playerInfoArr) ? playerInfoArr : [];
 
@@ -155,6 +176,8 @@ export async function fetchAllTransactions(leagueKey: string): Promise<ParsedTra
           player_name: playerName,
           player_position: displayPosition ?? null,
           team_key: teamKey,
+          // Per-player faabSpent (from transaction_data) is more reliable than the
+          // top-level faab_bid on the transaction metadata, which isn't always present.
           faab_spent: faabSpent ?? faab,
           week,
           season: SEASON,

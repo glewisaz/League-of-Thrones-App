@@ -1,118 +1,66 @@
 # League of Thrones
 
-A website for a 12-team dynasty fantasy football league with salary cap, escalating keeper contracts, multi-year rookie drafts, and playoff/consolation bracket tracking that Yahoo doesn't natively support.
+Dynasty fantasy football league site — the metadata layer Yahoo refuses to provide.
 
-Yahoo remains the source of truth for live rosters, scoring, and transactions. This site is the metadata layer on top: contracts, keeper costs, draft pick inventory, trade history, and the league record book.
+## What it does
+- Contract tracking with keeper cost formula
+- Draft pick inventory with trade history
+- Transaction feed (The Raven) pulled from Yahoo API
+- Record book (The White Book)
+- Commissioner admin panel (The Small Council)
 
-## Tech Stack
+## Tech stack
+- Next.js 15 (App Router) + TypeScript
+- Supabase (Postgres + Auth)
+- Vercel (hosting + deploys)
+- Yahoo Fantasy Sports API (OAuth 2.0)
 
-- **Framework:** Next.js (App Router) + TypeScript
-- **Database + Auth:** Supabase (Postgres)
-- **Hosting:** Vercel
-- **External API:** Yahoo Fantasy Sports (OAuth 2.0)
-- **Import tooling:** Python (one-time Google Sheet migration)
+## Local development
+1. Clone the repo
+2. Copy `.env.example` to `.env.local` and fill in values
+3. `npm install`
+4. `npm run dev`
 
-## Project Status
+## Environment variables needed
+- NEXT_PUBLIC_SUPABASE_URL
+- NEXT_PUBLIC_SUPABASE_ANON_KEY
+- SUPABASE_SERVICE_ROLE_KEY
+- YAHOO_CLIENT_ID
+- YAHOO_CLIENT_SECRET
+- YAHOO_REDIRECT_URI
 
-Phase 0 — Foundation. See `/docs/brief.md` for the full project brief and phased milestones.
+## Yahoo API setup
+1. Register app at developer.yahoo.com
+2. Set callback URL to `{your-domain}/api/yahoo/callback`
+3. Select Fantasy Sports → Read permission
+4. Run OAuth flow at `/api/yahoo/connect`
+5. Set `league_key` in `yahoo_auth` table (format: `461.l.708208`)
 
-## Getting Started
+## Sync order (first time setup)
+1. `/api/yahoo/sync-teams`
+2. `/api/yahoo/sync-rosters`
+3. `/api/yahoo/sync-transactions`
+4. `/api/admin/picks/seed`
 
-### Prerequisites
+## Key league rules
+- Keeper formula: `next_year_cost = round((current_season_cost + 2) * 1.05)`
+- Max 4 contract years — expires after year 4
+- $200 auction cap, $100 FAAB per season
+- 2 conferences (North/South), 6 teams each
+- Rookie draft picks 1–12, supplemental picks 13+
 
-- Node.js 20+
-- npm or pnpm
-- A Supabase project (free tier is fine)
-- Python 3.11+ (only needed for the one-time Sheet import)
+## Admin panel
+Protected at `/admin` — requires Supabase Auth login.
+Commissioner account set up via Supabase Dashboard → Authentication → Users.
 
-### First-time setup
-
+## Working across machines
 ```bash
-# Clone
-git clone https://github.com/glewisaz/League-of-Thrones-App.git
-cd League-of-Thrones-App
+# Before stopping
+git add . && git commit -m "wip: what I was doing" && git push
 
-# Install deps
-npm install
-
-# Copy env template and fill in values
-cp .env.example .env.local
-```
-
-You'll need these env vars in `.env.local`:
-
-- `NEXT_PUBLIC_SUPABASE_URL` — from your Supabase project settings
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — public anon key
-- `SUPABASE_SERVICE_ROLE_KEY` — server-side only, never commit
-- `YAHOO_CLIENT_ID` — from developer.yahoo.com
-- `YAHOO_CLIENT_SECRET` — server-side only
-
-### Run the dev server
-
-```bash
-npm run dev
-```
-
-Open http://localhost:3000.
-
-### Run tests
-
-```bash
-npm test
-```
-
-### Database migrations
-
-Schema lives in `/supabase/migrations`. Apply with the Supabase CLI:
-
-```bash
-supabase db push
-```
-
-## Working Across Machines
-
-This repo gets worked on from a desktop and a laptop. Rhythm to avoid pain:
-
-**Before stopping on one machine:**
-```bash
-git status        # anything uncommitted?
-git add .
-git commit -m "wip: what I was doing"
-git push
-```
-
-**Before starting on the other machine:**
-```bash
+# Before starting
 git pull
 ```
 
-If `git pull` ever complains about conflicts, stop and ask Claude before forcing anything.
-
-## Project Structure
-
-```
-/app              Next.js App Router pages
-/components       Shared React components
-/lib              Business logic (contracts, keeper math, etc.)
-/lib/yahoo        Yahoo API client + OAuth
-/lib/supabase     Supabase client setup
-/supabase         Schema migrations + seed data
-/scripts          One-off scripts (Sheet importer, etc.)
-/docs             Project brief, rules reference
-```
-
-## Key Principles
-
-1. **Yahoo is the source of truth for rosters. The site is the source of truth for contracts.** These never overlap.
-2. **Data entry must be fast.** Commissioner workflows are optimized for speed.
-3. **Sync reconciles, never overwrites contract data.** Mismatches surface in the admin dashboard; they don't self-heal.
-4. **Public site is read-only and cache-friendly.**
-5. **The admin panel is the product.** If it's a joy to use, the site stays fresh.
-
-## Commissioner Access
-
-Single-user admin. Magic link auth via Supabase. The admin panel is referred to in-app as "The Small Council."
-
 ## License
-
 Private project. Not licensed for reuse.

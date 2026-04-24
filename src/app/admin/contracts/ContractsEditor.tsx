@@ -37,7 +37,14 @@ export default function ContractsEditor({
   seasonYear: number;
 }) {
   const [selectedTeamId, setSelectedTeamId] = useState(teams[0]?.id ?? '');
+
+  // All teams' contracts are loaded into client state once on mount. The team
+  // selector is just a view filter — switching teams doesn't discard edits.
   const [contracts, setContracts] = useState<ContractRow[]>(initialContracts);
+
+  // dirtyIds tracks contract IDs with unsaved edits across ALL teams, not just
+  // the currently visible one. Save sends every dirty contract in a single PATCH
+  // regardless of which team the user is currently viewing.
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveError, setSaveError] = useState('');

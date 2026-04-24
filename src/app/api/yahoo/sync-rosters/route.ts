@@ -42,7 +42,10 @@ export async function GET() {
       );
     }
 
-    // Snapshot existing player contracts so we don't create duplicates
+    // Pre-load the set of player_ids that already have contracts. This prevents
+    // duplicate contract rows when sync-rosters is run more than once — we only
+    // create a skeleton contract for players not yet seen. The commissioner then
+    // fills in year_one_price and acquisition_type via the admin panel.
     const { data: existingRows } = await supabase
       .from('contracts')
       .select('player_id')
@@ -122,9 +125,14 @@ export async function GET() {
         }
         playersUpserted++;
 
-        // DEF/ST units are not keeper assets — skip contract creation
+        // DEF units are valid fantasy players and belong in the players table for
+        // transaction history, but they're not keeper assets — they're re-drafted
+        // every year via auction and never have multi-year contracts.
         const isDef = position === 'DEF';
         if (!isDef && !existingPlayerIds.has(playerKey)) {
+          // Skeleton contract: year_one_price=0 and acquisition_type='auction' are
+          // placeholder defaults. The commissioner must correct these via the admin
+          // contracts panel — the importer has no way to know the actual draft price.
           const { error: contractError } = await supabase.from('contracts').insert({
             player_id: playerKey,
             current_team_id: teamRow.id,
