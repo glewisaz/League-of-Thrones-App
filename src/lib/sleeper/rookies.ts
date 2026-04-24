@@ -1,3 +1,5 @@
+import { createAdminClient } from '@/lib/supabase/admin';
+
 export type SleeperRookie = {
   name: string;
   position: string;
@@ -8,49 +10,51 @@ export type SleeperRookie = {
 const SKILL_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE']);
 
 /**
- * Fetch top rookie prospects from Sleeper's public player database.
+ * Fetch true 2026 rookie prospects from Sleeper's public player database.
  *
- * Sleeper returns all ~2000 NFL players in one payload keyed by player_id.
- * We filter to years_exp === 0 (first-year players) + active + skill positions,
- * then sort by search_rank (Sleeper's overall prospect ranking, lower = better).
+ * Filters:
+ *   - years_exp === 0, active, on an NFL team, skill position, ranked < 9999
+ *   - Name not found in the `players` table — anyone already there was in last
+ *     year's Yahoo pool and is a returning vet/IR holdover, not a true rookie
  *
- * The fetch is cached for 24 hours at the Next.js layer — rookie rosters
- * don't change meaningfully day-to-day once the draft is over.
+ * Both the Sleeper fetch and DB lookup run in parallel and are cached 24h.
  */
 export async function fetchRookies(count = 15): Promise<SleeperRookie[]> {
-  const res = await fetch('https://api.sleeper.app/v1/players/nfl', {
-    next: { revalidate: 86400 },
-  });
-  if (!res.ok) throw new Error(`Sleeper API error: ${res.status}`);
+  const supabase = createAdminClient();
 
-  const data = (await res.json()) as Record<
-    string,
-    {
-      full_name?: string;
-      position?: string;
-      team?: string | null;
-      years_exp?: number | null;
-      active?: boolean;
-      search_rank?: number | null;
-    }
-  >;
+  const [sleeperRes, { data: existingPlayers }] = await Promise.all([
+    fetch('https://api.sleeper.app/v1/players/nfl', { next: { revalidate: 86400 } }),
+    supabase.from('players').select('name'),
+  ]);
 
-  return Object.values(data)
+  if (!sleeperRes.ok) throw new Error(`Sleeper API error: ${sleeperRes.status}`);
+
+  const allPlayers = (await sleeperRes.json()) as Record<string, Record<string, unknown>>;
+
+  const existingNames = new Set(
+    (existingPlayers ?? []).map((p) => p.name.toLowerCase()),
+  );
+
+  return Object.values(allPlayers)
     .filter(
       (p) =>
-        p.years_exp === 0 &&
         p.active === true &&
-        p.position != null &&
+        p.years_exp === 0 &&
+        p.team != null &&
+        typeof p.position === 'string' &&
         SKILL_POSITIONS.has(p.position) &&
-        p.full_name != null &&
-        p.search_rank != null,
+        typeof p.search_rank === 'number' &&
+        p.search_rank < 9999 &&
+        typeof p.first_name === 'string' &&
+        typeof p.last_name === 'string',
     )
-    .sort((a, b) => (a.search_rank ?? 9999) - (b.search_rank ?? 9999))
+    .filter((p) => !existingNames.has(`${p.first_name} ${p.last_name}`.toLowerCase()))
+    .sort((a, b) => (a.search_rank as number) - (b.search_rank as number))
     .slice(0, count)
     .map((p) => ({
-      name: p.full_name!,
-      position: p.position!,
-      team: p.team ?? null,
-      search_rank: p.search_rank!,
+      name: `${p.first_name} ${p.last_name}`,
+      position: p.position as string,
+      team: p.team as string | null,
+      search_rank: p.search_rank as number,
     }));
 }
