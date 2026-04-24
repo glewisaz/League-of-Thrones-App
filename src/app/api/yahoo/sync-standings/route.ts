@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server';
 import { yahooFetch } from '@/lib/yahoo/client';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { findInArray, iterateYahooObject } from '@/lib/yahoo/parse';
-import { getActiveSeason } from '@/lib/queries/seasons';
+
+// Hardcoded to 2025 — we're backfilling the final regular-season standings
+// from the completed 2025 Yahoo league. The active season is now 2026.
+const STANDINGS_SEASON = 2025;
 
 type ParsedStanding = {
   teamId: string;
@@ -31,9 +34,6 @@ export async function GET() {
         { status: 400 },
       );
     }
-
-    const season = await getActiveSeason();
-    const seasonYear = season?.year ?? new Date().getFullYear();
 
     // Pre-load yahoo_team_key → { id, conference } for all teams.
     // sync-teams must have run first to populate yahoo_team_key.
@@ -64,6 +64,8 @@ export async function GET() {
     }
 
     const teams = iterateYahooObject(teamsObj);
+    console.log('[sync-standings] Teams found in Yahoo response:', teams.length);
+
     const parsed: ParsedStanding[] = [];
 
     for (const entry of teams) {
@@ -88,6 +90,12 @@ export async function GET() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const ts = ((teamArr[1] as any)?.team_standings ??
         findInArray(info, 'team_standings')) as Record<string, unknown> | undefined;
+
+      // Log the raw team_standings for the first team to verify the shape
+      if (parsed.length === 0) {
+        console.log(`[sync-standings] First team key: "${teamKey}", teamArr[1]:`, JSON.stringify(teamArr[1], null, 2));
+      }
+
       if (!ts) {
         console.warn(`[sync-standings] No team_standings for "${teamKey}"`);
         continue;
@@ -128,7 +136,7 @@ export async function GET() {
         .from('standings')
         .upsert(
           {
-            season: seasonYear,
+            season: STANDINGS_SEASON,
             team_id: s.teamId,
             wins: s.wins,
             losses: s.losses,
@@ -150,7 +158,7 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       standings_synced: synced,
-      season: seasonYear,
+      season: STANDINGS_SEASON,
       ...(errors.length > 0 && { errors }),
     });
   } catch (err) {
