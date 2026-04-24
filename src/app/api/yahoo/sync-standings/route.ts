@@ -9,13 +9,12 @@ const STANDINGS_SEASON = 2025;
 
 type ParsedStanding = {
   teamId: string;
-  conference: string | null;
   wins: number;
   losses: number;
   ties: number;
   pointsFor: number;
   pointsAgainst: number;
-  seed: number; // computed within conference after all teams are parsed
+  seed: number;
 };
 
 export async function GET() {
@@ -35,16 +34,16 @@ export async function GET() {
       );
     }
 
-    // Pre-load yahoo_team_key → { id, conference } for all teams.
+    // Pre-load yahoo_team_key → team UUID for all teams.
     // sync-teams must have run first to populate yahoo_team_key.
     const { data: teamRows, error: teamsError } = await supabase
       .from('teams')
-      .select('id, conference, yahoo_team_key');
+      .select('id, yahoo_team_key');
     if (teamsError) throw teamsError;
 
-    const teamKeyMap = new Map<string, { id: string; conference: string | null }>();
-    for (const t of (teamRows ?? []) as { id: string; conference: string | null; yahoo_team_key: string | null }[]) {
-      if (t.yahoo_team_key) teamKeyMap.set(t.yahoo_team_key, { id: t.id, conference: t.conference });
+    const teamKeyMap = new Map<string, string>();
+    for (const t of (teamRows ?? []) as { id: string; yahoo_team_key: string | null }[]) {
+      if (t.yahoo_team_key) teamKeyMap.set(t.yahoo_team_key, t.id);
     }
 
     // Yahoo standings endpoint — returns teams in rank order with team_standings attached.
@@ -79,53 +78,38 @@ export async function GET() {
       const teamKey = findInArray(info, 'team_key') as string | undefined;
       if (!teamKey) continue;
 
-      const dbTeam = teamKeyMap.get(teamKey);
-      if (!dbTeam) {
+      const teamId = teamKeyMap.get(teamKey);
+      if (!teamId) {
         console.warn(`[sync-standings] No DB row for yahoo_team_key "${teamKey}" — run sync-teams first`);
         continue;
       }
 
-      // team_standings lives at teamArr[1]; fall back to scanning the info array
-      // in case Yahoo restructures the response between seasons.
+      // teamArr[0] — flat info array  [{team_key}, {team_id}, {name}, ...]
+      // teamArr[1] — { team_points: {...} }
+      // teamArr[2] — { team_standings: { rank, playoff_seed, outcome_totals, points_for, points_against } }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const ts = ((teamArr[1] as any)?.team_standings ??
-        findInArray(info, 'team_standings')) as Record<string, unknown> | undefined;
+      const ts = (teamArr[2] as any)?.team_standings as Record<string, unknown> | undefined;
 
-      // Log the raw team_standings for the first team to verify the shape
       if (parsed.length === 0) {
-        console.log(`[sync-standings] First team key: "${teamKey}", teamArr[1]:`, JSON.stringify(teamArr[1], null, 2));
+        console.log(`[sync-standings] First team key: "${teamKey}", teamArr[2]:`, JSON.stringify(teamArr[2], null, 2));
       }
 
       if (!ts) {
-        console.warn(`[sync-standings] No team_standings for "${teamKey}"`);
+        console.warn(`[sync-standings] No team_standings at teamArr[2] for "${teamKey}"`);
         continue;
       }
 
       const ot = ts.outcome_totals as Record<string, string> | undefined;
 
       parsed.push({
-        teamId: dbTeam.id,
-        conference: dbTeam.conference,
+        teamId,
         wins: parseInt((ot?.wins ?? '0'), 10),
         losses: parseInt((ot?.losses ?? '0'), 10),
         ties: parseInt((ot?.ties ?? '0'), 10),
         pointsFor: parseFloat((ts.points_for as string) ?? '0'),
         pointsAgainst: parseFloat((ts.points_against as string) ?? '0'),
-        seed: 0,
+        seed: typeof ts.playoff_seed === 'number' ? ts.playoff_seed : parseInt(ts.playoff_seed as string, 10),
       });
-    }
-
-    // Compute seed within each conference. Yahoo's top-level rank is the overall
-    // league rank (1–12); we want 1–6 per conference. Sort wins DESC, then PF DESC.
-    const byConference = new Map<string, ParsedStanding[]>();
-    for (const s of parsed) {
-      const key = s.conference ?? 'unknown';
-      if (!byConference.has(key)) byConference.set(key, []);
-      byConference.get(key)!.push(s);
-    }
-    for (const group of byConference.values()) {
-      group.sort((a, b) => b.wins - a.wins || b.pointsFor - a.pointsFor);
-      group.forEach((s, i) => { s.seed = i + 1; });
     }
 
     let synced = 0;
