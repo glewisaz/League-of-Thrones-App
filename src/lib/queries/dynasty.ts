@@ -1,4 +1,4 @@
-import { createAnonServerClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export type DynastyFreeAgent = {
   rank: number;
@@ -17,7 +17,7 @@ export type FreeAgentsByPosition = {
 const POSITIONS = ['QB', 'RB', 'WR', 'TE'] as const;
 
 export async function getDynastyFreeAgents(perPosition = 5): Promise<FreeAgentsByPosition> {
-  const supabase = createAnonServerClient();
+  const supabase = createAdminClient();
 
   const [{ data: rankings }, { data: rosteredContracts }, sleeperResp] = await Promise.all([
     supabase
