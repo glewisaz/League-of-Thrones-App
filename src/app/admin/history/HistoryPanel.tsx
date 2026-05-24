@@ -268,8 +268,10 @@ function SeasonRow({
         setMessage({ text: data.error ?? 'Request failed', ok: false });
       } else {
         const parts: string[] = [];
+        if (typeof data.already_mapped === 'number' && data.already_mapped > 0)
+          parts.push(`${data.already_mapped} already mapped`);
         if (typeof data.auto_matched === 'number')
-          parts.push(`${data.auto_matched}/${data.yahoo_teams} matched`);
+          parts.push(`${data.auto_matched} newly auto-matched`);
         if (data.unresolved?.length > 0)
           parts.push(`${data.unresolved.length} unresolved`);
         if (typeof data.standings_synced === 'number')

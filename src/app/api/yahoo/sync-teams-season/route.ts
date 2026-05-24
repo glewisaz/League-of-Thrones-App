@@ -9,14 +9,6 @@ type YahooTeamSummary = {
   manager: string | null;
 };
 
-type MatchResult = {
-  yahoo: YahooTeamSummary;
-  matched_team_id: string | null;
-  matched_owner_name: string | null;
-  /** "exact", "loose" (case/whitespace), or null for no match */
-  match_kind: 'exact' | 'loose' | null;
-};
-
 function normalize(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
@@ -101,6 +93,18 @@ export async function GET(req: NextRequest) {
     if (dbErr) throw dbErr;
     const dbTeamRows = (dbTeams ?? []) as { id: string; owner_name: string }[];
 
+    // Already-mapped Yahoo team_keys for this season — skip them rather
+    // than re-attempting auto-match. Makes Map Teams idempotent: re-running
+    // shows only what's still pending, not entries you've already resolved.
+    const { data: existingMappings } = await supabase
+      .from('team_season_keys')
+      .select('yahoo_team_key, team_id')
+      .eq('season', season);
+    const preMapped = new Map<string, string>();
+    for (const m of (existingMappings ?? []) as { yahoo_team_key: string; team_id: string }[]) {
+      preMapped.set(m.yahoo_team_key, m.team_id);
+    }
+
     // Build lookup: normalized owner_name → [team_id]. Lists not single ids,
     // so we can detect collisions (two owners with the same normalized name).
     const exactIdx = new Map<string, string[]>();
@@ -111,46 +115,49 @@ export async function GET(req: NextRequest) {
       exactIdx.set(key, list);
     }
 
-    const matches: MatchResult[] = yahooSummaries.map((yt) => {
-      if (!yt.manager) {
-        return { yahoo: yt, matched_team_id: null, matched_owner_name: null, match_kind: null };
-      }
+    type Outcome =
+      | { kind: 'pre'; yahoo: YahooTeamSummary; team_id: string }
+      | { kind: 'auto'; yahoo: YahooTeamSummary; team_id: string; owner: string; match: 'exact' | 'loose' }
+      | { kind: 'unresolved'; yahoo: YahooTeamSummary };
+
+    const outcomes: Outcome[] = yahooSummaries.map((yt): Outcome => {
+      const existingId = preMapped.get(yt.yahooTeamKey);
+      if (existingId) return { kind: 'pre', yahoo: yt, team_id: existingId };
+
+      if (!yt.manager) return { kind: 'unresolved', yahoo: yt };
       const norm = normalize(yt.manager);
       const candidates = exactIdx.get(norm);
       if (candidates && candidates.length === 1) {
         const owner = dbTeamRows.find((t) => t.id === candidates[0])!.owner_name;
-        return {
-          yahoo: yt,
-          matched_team_id: candidates[0],
-          matched_owner_name: owner,
-          match_kind: 'exact',
-        };
+        return { kind: 'auto', yahoo: yt, team_id: candidates[0], owner, match: 'exact' };
       }
-      // Loose: substring either direction
       const loose = dbTeamRows.filter((t) => {
         const n = normalize(t.owner_name);
         return n.includes(norm) || norm.includes(n);
       });
       if (loose.length === 1) {
-        return {
-          yahoo: yt,
-          matched_team_id: loose[0].id,
-          matched_owner_name: loose[0].owner_name,
-          match_kind: 'loose',
-        };
+        return { kind: 'auto', yahoo: yt, team_id: loose[0].id, owner: loose[0].owner_name, match: 'loose' };
       }
-      return { yahoo: yt, matched_team_id: null, matched_owner_name: null, match_kind: null };
+      return { kind: 'unresolved', yahoo: yt };
     });
 
-    const resolved = matches.filter((m) => m.matched_team_id != null);
-    const unresolved = matches.filter((m) => m.matched_team_id == null);
+    const autoNew = outcomes.filter((o): o is Extract<Outcome, { kind: 'auto' }> => o.kind === 'auto');
+    const alreadyMapped = outcomes.filter((o): o is Extract<Outcome, { kind: 'pre' }> => o.kind === 'pre');
+    const unresolved = outcomes
+      .filter((o): o is Extract<Outcome, { kind: 'unresolved' }> => o.kind === 'unresolved')
+      .map((o) => ({
+        yahoo: o.yahoo,
+        matched_team_id: null,
+        matched_owner_name: null,
+        match_kind: null,
+      }));
 
     let written = 0;
     if (!dryRun) {
-      for (const m of resolved) {
+      for (const m of autoNew) {
         const { error } = await supabase.from('team_season_keys').upsert(
           {
-            team_id: m.matched_team_id!,
+            team_id: m.team_id,
             season,
             yahoo_team_key: m.yahoo.yahooTeamKey,
             yahoo_league_key: leagueRow.yahoo_league_key,
@@ -168,12 +175,17 @@ export async function GET(req: NextRequest) {
       season,
       league_key: leagueRow.yahoo_league_key,
       yahoo_teams: yahooSummaries.length,
-      auto_matched: resolved.length,
+      already_mapped: alreadyMapped.length,
+      auto_matched: autoNew.length,
       written,
       unresolved,
-      // team_ids that are now taken for this season — the UI needs this
+      // team_ids that are now taken for this season — the UI uses this
       // to filter dropdown options when resolving the remaining conflicts.
-      matched_team_ids: resolved.map((r) => r.matched_team_id!),
+      // Includes both pre-existing mappings and this-run auto-matches.
+      matched_team_ids: [
+        ...alreadyMapped.map((o) => o.team_id),
+        ...autoNew.map((o) => o.team_id),
+      ],
       dry_run: dryRun,
     });
   } catch (err) {
