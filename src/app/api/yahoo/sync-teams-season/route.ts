@@ -171,6 +171,9 @@ export async function GET(req: NextRequest) {
       auto_matched: resolved.length,
       written,
       unresolved,
+      // team_ids that are now taken for this season — the UI needs this
+      // to filter dropdown options when resolving the remaining conflicts.
+      matched_team_ids: resolved.map((r) => r.matched_team_id!),
       dry_run: dryRun,
     });
   } catch (err) {

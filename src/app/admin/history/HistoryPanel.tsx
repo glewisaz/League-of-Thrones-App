@@ -15,6 +15,20 @@ export type SeasonStatus = {
   roster_count: number;
   has_champion: boolean;
   last_synced_at: string | null;
+  taken_team_ids: string[];
+};
+
+type Team = { id: string; owner_name: string };
+
+type UnresolvedYahoo = {
+  yahoo: {
+    yahooTeamKey: string;
+    yahooTeamName: string;
+    manager: string | null;
+  };
+  matched_team_id: string | null;
+  matched_owner_name: string | null;
+  match_kind: 'exact' | 'loose' | null;
 };
 
 type ActionId = 'teams' | 'standings' | 'matchups' | 'champions' | 'rosters';
@@ -52,27 +66,150 @@ function StatusDot({ ok, count }: { ok: boolean; count?: number }) {
   );
 }
 
-function ActionButton({
+function ResolveConflicts({
   season,
-  action,
-  disabled,
-  onResult,
+  unresolved,
+  takenTeamIds,
+  allTeams,
+  onDone,
 }: {
   season: number;
-  action: ActionId;
-  disabled?: boolean;
-  onResult: (msg: string, ok: boolean) => void;
+  unresolved: UnresolvedYahoo[];
+  takenTeamIds: string[];
+  allTeams: Team[];
+  onDone: (msg: string, ok: boolean) => void;
 }) {
-  const [pending, setPending] = useState(false);
+  // map yahoo_team_key -> chosen team_id (or '' for unset)
+  const [picks, setPicks] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
   const router = useRouter();
 
-  async function run() {
-    setPending(true);
+  const chosenIds = Object.values(picks).filter(Boolean);
+
+  function availableFor(currentKey: string): Team[] {
+    return allTeams.filter((t) => {
+      if (takenTeamIds.includes(t.id)) return false;
+      // Don't show team_ids picked in another dropdown on this form,
+      // unless it's the current row's own pick.
+      if (chosenIds.includes(t.id) && picks[currentKey] !== t.id) return false;
+      return true;
+    });
+  }
+
+  async function save() {
+    const mappings = Object.fromEntries(
+      Object.entries(picks).filter(([, v]) => v),
+    );
+    if (Object.keys(mappings).length === 0) {
+      onDone('Pick at least one franchise before saving.', false);
+      return;
+    }
+    setSaving(true);
     try {
-      const res = await fetch(ACTION_ENDPOINTS[action](season));
+      const res = await fetch('/api/yahoo/sync-teams-season', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ season, mappings }),
+      });
       const data = await res.json();
       if (!res.ok) {
-        onResult(data.error ?? 'Request failed', false);
+        onDone(data.error ?? 'Save failed', false);
+      } else {
+        onDone(`${data.written} mappings saved`, true);
+        router.refresh();
+      }
+    } catch {
+      onDone('Network error', false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 bg-neutral-950/60 border border-yellow-500/30 rounded p-3">
+      <div className="flex items-baseline justify-between mb-2">
+        <h4 className="text-sm font-semibold text-yellow-300">
+          Resolve {unresolved.length} team{unresolved.length === 1 ? '' : 's'}
+        </h4>
+        <span className="text-xs text-neutral-500">
+          {allTeams.length - takenTeamIds.length - chosenIds.length} franchises remaining
+        </span>
+      </div>
+      <div className="space-y-2">
+        {unresolved.map((u) => {
+          const opts = availableFor(u.yahoo.yahooTeamKey);
+          return (
+            <div
+              key={u.yahoo.yahooTeamKey}
+              className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3 items-center"
+            >
+              <div className="text-sm">
+                <div className="text-neutral-200">{u.yahoo.yahooTeamName}</div>
+                <div className="text-xs text-neutral-500">
+                  manager: {u.yahoo.manager ?? '(none)'} ·{' '}
+                  <span className="font-mono">{u.yahoo.yahooTeamKey}</span>
+                </div>
+              </div>
+              <select
+                value={picks[u.yahoo.yahooTeamKey] ?? ''}
+                onChange={(e) =>
+                  setPicks((prev) => ({
+                    ...prev,
+                    [u.yahoo.yahooTeamKey]: e.target.value,
+                  }))
+                }
+                className="w-full bg-neutral-900 border border-neutral-700 rounded px-2 py-1.5 text-sm text-neutral-200 focus:outline-none focus:border-cyan-500"
+              >
+                <option value="">— choose franchise —</option>
+                {opts.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.owner_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-3 flex justify-end">
+        <button
+          onClick={save}
+          disabled={saving}
+          className="px-4 py-1.5 text-sm font-semibold rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500/20 transition-colors disabled:opacity-40"
+        >
+          {saving ? 'Saving…' : 'Save mappings'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SeasonRow({
+  status,
+  allTeams,
+}: {
+  status: SeasonStatus;
+  allTeams: Team[];
+}) {
+  const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
+  const [pendingAction, setPendingAction] = useState<ActionId | null>(null);
+  const [unresolved, setUnresolved] = useState<UnresolvedYahoo[] | null>(null);
+  const [autoTakenIds, setAutoTakenIds] = useState<string[]>([]);
+  const router = useRouter();
+
+  const expected = status.num_teams ?? 12;
+  const teamsOk = status.teams_mapped >= expected;
+  const standingsOk = status.standings_count >= expected;
+  const matchupsOk = status.matchups_count > 0;
+  const rostersOk = status.roster_count > 0;
+
+  async function runAction(action: ActionId) {
+    setPendingAction(action);
+    try {
+      const res = await fetch(ACTION_ENDPOINTS[action](status.season));
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage({ text: data.error ?? 'Request failed', ok: false });
       } else {
         const parts: string[] = [];
         if (typeof data.auto_matched === 'number')
@@ -86,35 +223,29 @@ function ActionButton({
         if (typeof data.players_written === 'number')
           parts.push(`${data.players_written} players`);
         if (data.champion_team_id) parts.push('champion saved');
-        onResult(parts.length > 0 ? parts.join(' · ') : 'Done.', true);
+        setMessage({ text: parts.length > 0 ? parts.join(' · ') : 'Done.', ok: true });
+
+        if (action === 'teams') {
+          if (Array.isArray(data.unresolved) && data.unresolved.length > 0) {
+            setUnresolved(data.unresolved as UnresolvedYahoo[]);
+            setAutoTakenIds(
+              Array.isArray(data.matched_team_ids) ? (data.matched_team_ids as string[]) : [],
+            );
+          } else {
+            setUnresolved(null);
+          }
+        }
         router.refresh();
       }
     } catch {
-      onResult('Network error', false);
+      setMessage({ text: 'Network error', ok: false });
     } finally {
-      setPending(false);
+      setPendingAction(null);
     }
   }
 
-  return (
-    <button
-      onClick={run}
-      disabled={pending || disabled}
-      className="px-3 py-1.5 text-xs font-medium rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-    >
-      {pending ? '…' : ACTION_LABELS[action]}
-    </button>
-  );
-}
-
-function SeasonRow({ status }: { status: SeasonStatus }) {
-  const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
-
-  const expected = status.num_teams ?? 12;
-  const teamsOk = status.teams_mapped >= expected;
-  const standingsOk = status.standings_count >= expected;
-  const matchupsOk = status.matchups_count > 0;
-  const rostersOk = status.roster_count > 0;
+  // Combined taken list: server-side existing + this-session auto matches.
+  const takenIds = Array.from(new Set([...status.taken_team_ids, ...autoTakenIds]));
 
   return (
     <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4">
@@ -157,36 +288,24 @@ function SeasonRow({ status }: { status: SeasonStatus }) {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <ActionButton
-          season={status.season}
-          action="teams"
-          disabled={!status.league_key}
-          onResult={(t, ok) => setMessage({ text: t, ok })}
-        />
-        <ActionButton
-          season={status.season}
-          action="standings"
-          disabled={!teamsOk}
-          onResult={(t, ok) => setMessage({ text: t, ok })}
-        />
-        <ActionButton
-          season={status.season}
-          action="matchups"
-          disabled={!teamsOk}
-          onResult={(t, ok) => setMessage({ text: t, ok })}
-        />
-        <ActionButton
-          season={status.season}
-          action="champions"
-          disabled={!matchupsOk}
-          onResult={(t, ok) => setMessage({ text: t, ok })}
-        />
-        <ActionButton
-          season={status.season}
-          action="rosters"
-          disabled={!teamsOk}
-          onResult={(t, ok) => setMessage({ text: t, ok })}
-        />
+        {(['teams', 'standings', 'matchups', 'champions', 'rosters'] as ActionId[]).map((a) => {
+          const isDisabled =
+            (a === 'teams' && !status.league_key) ||
+            (a === 'standings' && !teamsOk) ||
+            (a === 'matchups' && !teamsOk) ||
+            (a === 'champions' && !matchupsOk) ||
+            (a === 'rosters' && !teamsOk);
+          return (
+            <button
+              key={a}
+              onClick={() => runAction(a)}
+              disabled={pendingAction != null || isDisabled}
+              className="px-3 py-1.5 text-xs font-medium rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {pendingAction === a ? '…' : ACTION_LABELS[a]}
+            </button>
+          );
+        })}
       </div>
 
       {message && (
@@ -199,6 +318,19 @@ function SeasonRow({ status }: { status: SeasonStatus }) {
         >
           {message.text}
         </p>
+      )}
+
+      {unresolved && unresolved.length > 0 && (
+        <ResolveConflicts
+          season={status.season}
+          unresolved={unresolved}
+          takenTeamIds={takenIds}
+          allTeams={allTeams}
+          onDone={(t, ok) => {
+            setMessage({ text: t, ok });
+            if (ok) setUnresolved(null);
+          }}
+        />
       )}
     </div>
   );
@@ -263,7 +395,13 @@ function DiscoverAll() {
   );
 }
 
-export default function HistoryPanel({ statuses }: { statuses: SeasonStatus[] }) {
+export default function HistoryPanel({
+  statuses,
+  allTeams,
+}: {
+  statuses: SeasonStatus[];
+  allTeams: Team[];
+}) {
   return (
     <div className="space-y-4">
       <DiscoverAll />
@@ -271,7 +409,7 @@ export default function HistoryPanel({ statuses }: { statuses: SeasonStatus[] })
         .slice()
         .sort((a, b) => b.season - a.season)
         .map((s) => (
-          <SeasonRow key={s.season} status={s} />
+          <SeasonRow key={s.season} status={s} allTeams={allTeams} />
         ))}
     </div>
   );

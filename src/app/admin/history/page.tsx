@@ -20,19 +20,21 @@ export default async function HistoryAdminPage() {
   const [
     { data: seasons },
     { data: leagues },
-    { data: keyCounts },
+    { data: keyRows },
     { data: standingsCounts },
     { data: matchupCounts },
     { data: champions },
     { data: rosterCounts },
+    { data: allTeams },
   ] = await Promise.all([
     admin.from('seasons').select('year, is_active').order('year'),
     admin.from('season_leagues').select('*'),
-    admin.from('team_season_keys').select('season'),
+    admin.from('team_season_keys').select('season, team_id'),
     admin.from('standings').select('season'),
     admin.from('matchups').select('season'),
     admin.from('champions').select('season, champion_team_id'),
     admin.from('historical_rosters').select('season'),
+    admin.from('teams').select('id, owner_name').order('owner_name'),
   ]);
 
   const tally = (rows: { season: number }[] | null) => {
@@ -47,7 +49,16 @@ export default async function HistoryAdminPage() {
       l as Record<string, unknown>,
     ]),
   );
-  const keyTally = tally(keyCounts as { season: number }[] | null);
+  const keyTally = tally(keyRows as { season: number }[] | null);
+
+  // For each season, which team_ids are already taken — used by the
+  // resolve-conflicts UI to filter dropdown options.
+  const takenByeSeason = new Map<number, string[]>();
+  for (const k of (keyRows ?? []) as { season: number; team_id: string }[]) {
+    const list = takenByeSeason.get(k.season) ?? [];
+    list.push(k.team_id);
+    takenByeSeason.set(k.season, list);
+  }
   const standingsTally = tally(standingsCounts as { season: number }[] | null);
   const matchupTally = tally(matchupCounts as { season: number }[] | null);
   const rosterTally = tally(rosterCounts as { season: number }[] | null);
@@ -72,8 +83,11 @@ export default async function HistoryAdminPage() {
       roster_count: rosterTally.get(year) ?? 0,
       has_champion: championSet.has(year),
       last_synced_at: (lg?.last_synced_at as string | undefined) ?? null,
+      taken_team_ids: takenByeSeason.get(year) ?? [],
     };
   });
+
+  const allTeamsList = (allTeams ?? []) as { id: string; owner_name: string }[];
 
   return (
     <div className="min-h-screen bg-[#0a0c10] text-[#e8eaf0]">
@@ -86,7 +100,7 @@ export default async function HistoryAdminPage() {
           </p>
         </div>
 
-        <HistoryPanel statuses={statuses} />
+        <HistoryPanel statuses={statuses} allTeams={allTeamsList} />
       </div>
     </div>
   );
