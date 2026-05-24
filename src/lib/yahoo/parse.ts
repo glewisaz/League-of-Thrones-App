@@ -15,14 +15,24 @@
  */
 
 /**
- * Find the value for `key` in a Yahoo info array (array of single-key objects).
- * Returns undefined if the key is not present in any element.
+ * Find the value for `key` in a Yahoo info structure.
+ *
+ * Yahoo is inconsistent — most endpoints (player, team, transaction) return
+ * an array of single-key objects, but some (game, league summary in the
+ * /games/leagues endpoint) return a single flat object instead. We handle
+ * both so callers don't have to guess which shape they got.
  */
-export function findInArray(arr: unknown[], key: string): unknown {
-  for (const item of arr) {
-    if (item && typeof item === 'object' && key in (item as object)) {
-      return (item as Record<string, unknown>)[key];
+export function findInArray(arr: unknown, key: string): unknown {
+  if (Array.isArray(arr)) {
+    for (const item of arr) {
+      if (item && typeof item === 'object' && key in (item as object)) {
+        return (item as Record<string, unknown>)[key];
+      }
     }
+    return undefined;
+  }
+  if (arr && typeof arr === 'object' && key in (arr as object)) {
+    return (arr as Record<string, unknown>)[key];
   }
   return undefined;
 }
