@@ -22,7 +22,7 @@ export default async function AdminContractsPage() {
         )
         .eq('status', 'active')
         .order('current_team_id'),
-      admin.from('teams').select('id, name, owner_name').order('owner_name'),
+      admin.from('teams').select('id, name, owner_name').eq('is_ghost', false).order('owner_name'),
       getActiveSeason(),
     ]);
 

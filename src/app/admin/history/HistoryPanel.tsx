@@ -81,19 +81,55 @@ function ResolveConflicts({
 }) {
   // map yahoo_team_key -> chosen team_id (or '' for unset)
   const [picks, setPicks] = useState<Record<string, string>>({});
+  // Ghost franchises created during this session — added to the dropdown
+  // options on top of the server-provided allTeams list.
+  const [extraTeams, setExtraTeams] = useState<Team[]>([]);
   const [saving, setSaving] = useState(false);
+  const [creatingGhostFor, setCreatingGhostFor] = useState<string | null>(null);
   const router = useRouter();
 
+  const teamPool = [...allTeams, ...extraTeams];
   const chosenIds = Object.values(picks).filter(Boolean);
 
   function availableFor(currentKey: string): Team[] {
-    return allTeams.filter((t) => {
+    return teamPool.filter((t) => {
       if (takenTeamIds.includes(t.id)) return false;
       // Don't show team_ids picked in another dropdown on this form,
       // unless it's the current row's own pick.
       if (chosenIds.includes(t.id) && picks[currentKey] !== t.id) return false;
       return true;
     });
+  }
+
+  async function createGhost(u: UnresolvedYahoo) {
+    const ownerGuess = u.yahoo.manager?.trim() || u.yahoo.yahooTeamName;
+    if (!ownerGuess) {
+      onDone('No manager name available to seed a ghost from', false);
+      return;
+    }
+    setCreatingGhostFor(u.yahoo.yahooTeamKey);
+    try {
+      const res = await fetch('/api/admin/teams/ghost', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ owner_name: ownerGuess, name: u.yahoo.yahooTeamName }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        onDone(data.error ?? 'Ghost creation failed', false);
+        return;
+      }
+      const newTeam: Team = {
+        id: data.team.id,
+        owner_name: data.team.owner_name,
+      };
+      setExtraTeams((prev) => [...prev, newTeam]);
+      setPicks((prev) => ({ ...prev, [u.yahoo.yahooTeamKey]: newTeam.id }));
+    } catch {
+      onDone('Network error creating ghost', false);
+    } finally {
+      setCreatingGhostFor(null);
+    }
   }
 
   async function save() {
@@ -138,10 +174,13 @@ function ResolveConflicts({
       <div className="space-y-2">
         {unresolved.map((u) => {
           const opts = availableFor(u.yahoo.yahooTeamKey);
+          const currentPick = picks[u.yahoo.yahooTeamKey];
+          const isGhostJustCreated =
+            currentPick && extraTeams.some((t) => t.id === currentPick);
           return (
             <div
               key={u.yahoo.yahooTeamKey}
-              className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3 items-center"
+              className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-2 md:gap-3 items-center"
             >
               <div className="text-sm">
                 <div className="text-neutral-200">{u.yahoo.yahooTeamName}</div>
@@ -151,22 +190,39 @@ function ResolveConflicts({
                 </div>
               </div>
               <select
-                value={picks[u.yahoo.yahooTeamKey] ?? ''}
+                value={currentPick ?? ''}
                 onChange={(e) =>
                   setPicks((prev) => ({
                     ...prev,
                     [u.yahoo.yahooTeamKey]: e.target.value,
                   }))
                 }
-                className="w-full bg-neutral-900 border border-neutral-700 rounded px-2 py-1.5 text-sm text-neutral-200 focus:outline-none focus:border-cyan-500"
+                className="w-full md:w-56 bg-neutral-900 border border-neutral-700 rounded px-2 py-1.5 text-sm text-neutral-200 focus:outline-none focus:border-cyan-500"
               >
                 <option value="">— choose franchise —</option>
                 {opts.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.owner_name}
+                    {extraTeams.some((e) => e.id === t.id) ? ' (ghost)' : ''}
                   </option>
                 ))}
               </select>
+              <button
+                onClick={() => createGhost(u)}
+                disabled={creatingGhostFor != null || !!currentPick}
+                title={
+                  currentPick
+                    ? 'Already mapped — clear the dropdown to create a ghost'
+                    : `Create a ghost franchise for ${u.yahoo.manager ?? u.yahoo.yahooTeamName}`
+                }
+                className="px-2 py-1.5 text-xs font-medium rounded bg-neutral-800 text-neutral-300 border border-neutral-700 hover:bg-neutral-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+              >
+                {creatingGhostFor === u.yahoo.yahooTeamKey
+                  ? '…'
+                  : isGhostJustCreated
+                    ? '✓ ghost'
+                    : '+ Ghost'}
+              </button>
             </div>
           );
         })}

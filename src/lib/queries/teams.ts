@@ -28,6 +28,7 @@ export async function getAllTeams(): Promise<Team[]> {
   const { data, error } = await supabase
     .from('teams')
     .select('*')
+    .eq('is_ghost', false)
     .order('owner_name');
   if (error) throw error;
   return (data ?? []) as Team[];

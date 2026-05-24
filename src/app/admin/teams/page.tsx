@@ -14,6 +14,7 @@ export default async function AdminTeamsPage() {
   const { data: teams, error } = await admin
     .from('teams')
     .select('id, name, owner_name, conference')
+    .eq('is_ghost', false)
     .order('name');
   if (error) throw error;
 

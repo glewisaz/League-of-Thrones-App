@@ -24,7 +24,7 @@ export default async function AdminPicksPage() {
         .order('season')
         .order('pick_type')
         .order('original_team_id'),
-      admin.from('teams').select('id, name, owner_name').order('owner_name'),
+      admin.from('teams').select('id, name, owner_name').eq('is_ghost', false).order('owner_name'),
     ]);
 
   if (picksError) throw picksError;
