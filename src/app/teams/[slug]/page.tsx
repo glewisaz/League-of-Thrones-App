@@ -64,9 +64,17 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
         <span className="text-neutral-300">{team.owner_name}</span>
       </nav>
 
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-accent">{team.owner_name}</h1>
-        {team.name && <p className="text-neutral-400 mt-1">{team.name}</p>}
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-accent">{team.owner_name}</h1>
+          {team.name && <p className="text-neutral-400 mt-1">{team.name}</p>}
+        </div>
+        <Link
+          href={`/franchises/${team.slug}`}
+          className="text-sm text-neutral-400 hover:text-accent transition-colors"
+        >
+          Franchise history →
+        </Link>
       </div>
 
       {/* Cap commitment card */}

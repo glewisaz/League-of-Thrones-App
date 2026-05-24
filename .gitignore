@@ -37,3 +37,6 @@ yarn-error.log*
 
 # Vercel
 .vercel
+
+# Supabase CLI session state — local to each developer
+supabase/.temp/

@@ -36,11 +36,32 @@ Dynasty fantasy football league site — the metadata layer Yahoo refuses to pro
 4. Run OAuth flow at `/api/yahoo/connect`
 5. Set `league_key` in `yahoo_auth` table (format: `461.l.708208`)
 
+## Database migrations
+Migrations live as plain SQL files in `supabase/migrations/`. They are not
+applied automatically — push them up via the Supabase CLI:
+
+```bash
+# One-time setup
+npm i -g supabase                              # install the CLI
+supabase login                                 # browser auth, opens once
+supabase link --project-ref <project-ref>      # from your dashboard URL
+
+# Every time you add a new migration
+supabase db push                               # diffs local vs remote, applies new files
+```
+
+`supabase db push` is idempotent — files that were applied before are skipped.
+
 ## Sync order (first time setup)
 1. `/api/yahoo/sync-teams`
 2. `/api/yahoo/sync-rosters`
 3. `/api/yahoo/sync-transactions`
 4. `/api/admin/picks/seed`
+
+## Historical Yahoo backfill
+After migration `0006` is applied, the Small Council can backfill prior seasons
+from `/admin/history` — discover leagues, map teams, then sync standings,
+matchups, champion, and rosters per season.
 
 ## Key league rules
 - Keeper formula: `next_year_cost = round((current_season_cost + 2) * 1.05)`
